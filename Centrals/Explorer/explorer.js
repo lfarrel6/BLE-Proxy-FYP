@@ -5,41 +5,49 @@ var noble  = require('noble')
 server.on('request', function(req, res){
 	var uuid = req.url.split('/')[1];
 
-	var result = runBLE(uuid);
-
-	res.write(result);
-	res.end('\n\n EOM');
+	runBLE(uuid, res);
 });
 
+function requestComplete(output, response){
+	response.write(output);
+	res.end('\n\n EOM');
+}
+
 server.listen(function(){
-	var req = coap.request('coap://localhost/tester');
+	/*var req = coap.request('coap://localhost/tester');
 
 	req.on('response', function(res){
 		res.pipe(process.stdout);
-		response.on('end', function(){
+		res.on('end', function(){
 			console.log('\n---\n');
 		});
 	});
 
-	req.end();
+	req.end();*/
 });
 
-function runBLE(uuid){
+function runBLE(uuid, response){
+	console.log('running ble');
 	noble.on('stateChange', function(state){
+		console.log('State Change Event... ', state);
 		if(state === 'poweredOn'){
 			console.log('Beginnin BLE scan for uuid ' + uuid);
 			// Begin scan, looking for given uuid, do not allow duplicates
 			
-			//noble.startScanning([uuid], false);
-			console.log('Scanning would happen now');
+			console.log('> Scanning...');
+			noble.startScanning([uuid], false);
 
-		} else{ noble.stopScanning(); }
+		} else{ 
+			console.log('BLE turned off..');
+			noble.stopScanning();
+		}
 	});
 
 	noble.on('discover', function(peripheral){
 		//peripheral located, can stop scanning
-		console.log('Scanning would stop now');
-		//noble.stopScanning();
+		
+		console.log('> Scanning Complete...');
+		noble.stopScanning();
 
 		// advertisement contains: name, power level, advertised uuids, & manufacturer data0
 		console.log('Found peripheral: ', peripheral.advertisement);
@@ -60,6 +68,7 @@ function runBLE(uuid){
 
 							// just want to show them, until we have more meaningful operations
 							console.log('Characteristic found: ', characteristic.uuid);
+							requestComplete('Success', response);
 
 						});
 
