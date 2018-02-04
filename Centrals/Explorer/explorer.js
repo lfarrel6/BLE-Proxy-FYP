@@ -1,83 +1,85 @@
-var noble  = require('noble')
-  , coap   = require('coap')
-  , server = coap.createServer();
+var noble       = require('noble')
+  , coap        = require('coap')
+  , server      = coap.createServer()
+  , discoveries = new Set();
 
 server.on('request', function(req, res){
+	console.log(req.method + ' request');
 	var uuid = req.url.split('/')[1];
 
-	runBLE(uuid, res);
+	//runBLE(uuid, res);
+	console.log('request received');
+	requestComplete(res);
 });
 
-function requestComplete(output, response){
-	response.write(output);
-	res.end('\n\n EOM');
+function requestComplete(response){
+	console.log('finishing response');
+	if(discoveries.size > 0){
+		for(let discovery of discoveries) response.write(discovery);
+	}else{
+		response.write('no devices found');
+	}
+	//response.write(output);
+	response.end('\n\n EOM');
 }
 
-server.listen(function(){
-	/*var req = coap.request('coap://localhost/tester');
-
-	req.on('response', function(res){
-		res.pipe(process.stdout);
-		res.on('end', function(){
-			console.log('\n---\n');
-		});
-	});
-
-	req.end();*/
+//Provide coap port
+server.listen(5683, function(){
+	console.log('listening...');
 });
 
-function runBLE(uuid, response){
-	console.log('running ble');
-	noble.on('stateChange', function(state){
-		console.log('State Change Event... ', state);
-		if(state === 'poweredOn'){
-			console.log('Beginnin BLE scan for uuid ' + uuid);
-			// Begin scan, looking for given uuid, do not allow duplicates
-			
-			console.log('> Scanning...');
-			noble.startScanning([uuid], false);
+noble.on('stateChange', function(state){
+	console.log('State Change Event... ', state);
+	if(state === 'poweredOn'){
+		//console.log('Beginnin BLE scan for uuid ' + uuid);
 
-		} else{ 
-			console.log('BLE turned off..');
-			noble.stopScanning();
-		}
-	});
-
-	noble.on('discover', function(peripheral){
-		//peripheral located, can stop scanning
-		
-		console.log('> Scanning Complete...');
+		noble.startScanning([], false);
+	} else{ 
+		console.log('BLE turned off..');
 		noble.stopScanning();
+	}
+});
 
-		// advertisement contains: name, power level, advertised uuids, & manufacturer data0
-		console.log('Found peripheral: ', peripheral.advertisement);
+noble.on('scanStart', function(){
+	console.log('> Scanning...');
+});
 
-		peripheral.connect(function(err){
-			//connect to peripheral, interrogate for requested service
-			peripheral.discoverServices([uuid], function(err, services){
+noble.on('scanStop', function(){
+	console.log('> Finished Scanning...');
+});
+
+noble.on('discover', function(peripheral){
+	//peripheral located, can stop scanning
+	noble.stopScanning();
+	console.log('> Peripheral Discovered');
+
+	// advertisement contains: name, power level, advertised uuids, & manufacturer data0
+	console.log('Found peripheral: ', peripheral.advertisement);
+	var advertisement = peripheral.advertisement;
+	discoveries.add(peripheral.id);
+
+	peripheral.connect(function(err){
+		//connect to peripheral, interrogate for requested service
+		peripheral.discoverServices([uuid], function(err, services){
 				
+			services.forEach(function(service){
+				//this service matches, so must be what we're looking for
 
-				services.forEach(function(service){
-					//this service matches, so must be what we're looking for
-
-					console.log('Requested Service discovered? ', service.uuid === uuid)
+				console.log('Requested Service discovered? ', service.uuid === uuid)
 					
-					service.discoverCharateristics([], function(err, characteristics){
+				service.discoverCharateristics([], function(err, characteristics){
 
-						characteristics.forEach(function(characteristic){
+					characteristics.forEach(function(characteristic){
 
-							// just want to show them, until we have more meaningful operations
-							console.log('Characteristic found: ', characteristic.uuid);
-							requestComplete('Success', response);
-
-						});
+						// just want to show them, until we have more meaningful operations
+						console.log('Characteristic found: ', characteristic.uuid);
+						requestComplete('Success', response);
 
 					});
 
 				});
-			
 			});
+		
 		});
-
 	});
-}
+});
