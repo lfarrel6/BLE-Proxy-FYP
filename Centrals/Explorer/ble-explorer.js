@@ -1,5 +1,6 @@
 var noble             = require('noble')
   , coap              = require('coap')
+  , async             = require('async')
   , server            = coap.createServer()
   , discoveries       = []
   , proximity_timeout = 2000; //if a discovery is out of range after 2000 milliseconds, delete it from our list
@@ -18,6 +19,9 @@ server.on('request', function(req, res){
 			var avail = getPeripheral(id);
 			console.log('Peripheral found successfully? ' + avail);
 
+			if(avail){
+				res = getInformation(id, res);	
+			}
 			requestComplete(res, avail);
 
 			break;
@@ -39,13 +43,45 @@ function getPeripheral(id){
 	return false;
 }
 
+function getInformation(id, res){
+	var requestedPeripheral = discoveries[id].peripheral;
+
+	requestedPeripheral.on('disconnect', function(){
+		console.log('> Requested Peripheral disconnect');
+		res.write('Peripheral disconnect @ ' + Date.now());
+	});
+
+	requestedPeripheral.connect(function(err){
+		requestedPeripheral.discoverServices([], function(error, services){
+			var i = 0;
+
+			async.whilst(
+				function(){ return i < services.length; },
+				function(callback){
+					var service = services[serviceIndex];
+			        var serviceInfo = service.uuid;
+
+			        if (service.name) {
+			          serviceInfo += ' (' + service.name + ')';
+			        }
+			        console.log('> ' + serviceInfo);
+			        res.write('#' + i + ': ' + serviceInfo + '\n');
+			        i++;
+				},
+				function(err){ requestedPeripheral.disconnect(); }
+			);
+		});
+	});
+	return res;
+}
+
 function requestComplete(response, available){
 	if(available){
 		response.code = '2.01'; // message code complies with CoAP standards (success)
-		response.write('Device located successfully');
+		//response.write('Device located successfully');
 	}else{
 		response.code = '5.01'; // message code complies with CoAP standards (server failure)
-		response.write('Device not found');
+		//response.write('Device not found');
 	}
 	response.end('\n');
 }
