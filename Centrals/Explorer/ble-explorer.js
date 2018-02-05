@@ -41,16 +41,18 @@ function getPeripheral(id){
 
 function requestComplete(response, available){
 	if(available){
+		response.code = '2.01'; // message code complies with CoAP standards (success)
 		response.write('Device located successfully');
 	}else{
-		response.write('Devices not found');
+		response.code = '5.01'; // message code complies with CoAP standards (server failure)
+		response.write('Device not found');
 	}
 	response.end('\n');
 }
 
 //Provide coap port
 server.listen(5683, function(){
-	console.log('listening...');
+	console.log('Server started.')
 });
 
 /**
@@ -86,7 +88,7 @@ noble.on('discover', function(peripheral){
 		discoveries[id] = {
 			peripheral: peripheral
 		};
-		console.log('New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
+		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
 	}
 
 	discoveries[id].lastSeen = Date.now();
@@ -95,7 +97,7 @@ noble.on('discover', function(peripheral){
 setInterval(function(){
 	for(var id in discoveries){
 		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout)){
-			console.log('Lost peripheral (' + discoveries[id].peripheral.advertisement.localName + ')');
+			console.log('> Lost peripheral (' + discoveries[id].peripheral.advertisement.localName + ')');
 
 			delete(discoveries[id]);
 		}
