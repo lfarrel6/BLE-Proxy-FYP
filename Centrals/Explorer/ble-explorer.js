@@ -13,16 +13,27 @@ server.on('request', function(req, res){
 			console.log('Request URL: ' + req.url);
 			console.log('Split URL: ' + req.url.split('/'));
 
-			var id = req.url.split('/')[1];
-			console.log('ID requested: ' + id);
+			var args = req.url.split('/');
 
-			var avail = getPeripheral(id);
-			console.log('Peripheral found successfully? ' + avail);
+			if(args.length > 1){
 
-			if(avail){
-				res = getInformation(id, res);	
+				var id = args[1];
+				console.log('ID requested: ' + id);
+
+				var avail = getPeripheral(id);
+				console.log('Peripheral found successfully? ' + (avail == 0));
+
+				if(avail == 0){
+					res = getInformation(id, res);	
+				}
+				requestComplete(res, avail);
+			}else{
+				// return all discoveries
+				for(var discovered in discoveries){
+					res.write(discovered.info + '\n');
+				}
+				requestComplete(res, 0);
 			}
-			requestComplete(res, avail);
 
 			break;
 		//case    'PUT':
@@ -39,8 +50,8 @@ function getPeripheral(id){
 	var inRange;
 	inRange = discoveries[id];
 
-	if(inRange){ return true; }
-	return false;
+	if(inRange){ return 0; }
+	return 2;
 }
 
 function getInformation(id, res){
@@ -75,13 +86,13 @@ function getInformation(id, res){
 	return res;
 }
 
-function requestComplete(response, available){
-	if(available){
+function requestComplete(response, status){
+	if(status == 0){
 		response.code = '2.01'; // message code complies with CoAP standards (success)
-		//response.write('Device located successfully');
+	}else if(status == 1){
+		response.code = '4.01'; // message code complies with CoAP standards (client failure)
 	}else{
-		response.code = '5.01'; // message code complies with CoAP standards (server failure)
-		//response.write('Device not found');
+		response.code = '5.01'; // message code complies with CoAP standards (client failure)
 	}
 	response.end('\n');
 }
@@ -121,8 +132,10 @@ noble.on('discover', function(peripheral){
 
 	//if discovery is new
 	if(!discoveries[id]){
+		var peripheralInfo = peripheral.id + ' (' + peripheral.advertisement.localName + ')';
 		discoveries[id] = {
-			peripheral: peripheral
+			peripheral: peripheral,
+			info: peripheralInfo
 		};
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
 	}
@@ -133,7 +146,7 @@ noble.on('discover', function(peripheral){
 setInterval(function(){
 	for(var id in discoveries){
 		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout)){
-			console.log('> Lost peripheral (' + discoveries[id].peripheral.advertisement.localName + ')');
+			console.log('> Lost peripheral ' + discoveries[id].info);
 
 			delete(discoveries[id]);
 		}
