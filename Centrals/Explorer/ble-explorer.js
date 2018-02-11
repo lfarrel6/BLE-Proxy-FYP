@@ -3,7 +3,8 @@ var noble             = require('noble')
   , async             = require('async')
   , server            = coap.createServer()
   , discoveries       = []
-  , proximity_timeout = 2000; //if a discovery is out of range after 2000 milliseconds, delete it from our list
+  , proximity_timeout = 2000 //if a discovery is out of range after 2000 milliseconds, delete it from our list
+  , lookup_table      = require('./assets/Service-UUID-LUT.JSON');
 
 server.on('request', function(req, res){
 	console.log(req.method + ' request');
@@ -24,7 +25,9 @@ server.on('request', function(req, res){
 				console.log('Peripheral found successfully? ' + (avail == 0));
 
 				if(avail == 0){
-					res = getInformation(id, res);	
+					console.log("> Available paths: " + discoveries[id]["paths"]);
+
+					console.log("> Path requested: " + args[2] + " - is valid: " + isValidPath(discoveries[id]["paths"].includes(args[2])));
 				}
 				requestComplete(res, avail);
 			}else{
@@ -54,17 +57,19 @@ function getPeripheral(id){
 	return 2;
 }
 
-function getInformation(id, res){
+function getInformation(id){
 	var requestedPeripheral = discoveries[id].peripheral;
+
+	var url_paths = [];
 
 	requestedPeripheral.on('disconnect', function(){
 		console.log('> Requested Peripheral disconnect');
-		res.write('Peripheral disconnect @ ' + Date.now());
+		console.log('Peripheral disconnect @ ' + Date.now());
 	});
 
 	requestedPeripheral.connect(function(err){
 		requestedPeripheral.discoverServices([], function(error, services){
-			var i = 0;
+			var i = 0, paths = 0;
 
 			async.whilst(
 				function(){ return i < services.length; },
@@ -72,18 +77,19 @@ function getInformation(id, res){
 					var service = services[serviceIndex];
 			        var serviceInfo = service.uuid;
 
-			        if (service.name) {
-			          serviceInfo += ' (' + service.name + ')';
+			        if (lookup_table[service.uuid]) {
+			        	url_paths[paths] = lookup_table[service.uuid];
+			        	paths++;
+
+			        	console.log('> ' + lookup_table[service.uuid]);
 			        }
-			        console.log('> ' + serviceInfo);
-			        res.write('#' + i + ': ' + serviceInfo + '\n');
 			        i++;
 				},
 				function(err){ requestedPeripheral.disconnect(); }
 			);
 		});
 	});
-	return res;
+	return url_paths;
 }
 
 function requestComplete(response, status){
@@ -135,7 +141,8 @@ noble.on('discover', function(peripheral){
 		var peripheralInfo = peripheral.id + ' (' + peripheral.advertisement.localName + ')';
 		discoveries[id] = {
 			peripheral: peripheral,
-			info: peripheralInfo
+			info: peripheralInfo,
+			paths: getInformation(peripheral.id)
 		};
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
 	}
