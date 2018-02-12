@@ -4,7 +4,8 @@ var noble             = require('noble')
   , server            = coap.createServer()
   , discoveries       = []
   , proximity_timeout = 2000 //if a discovery is out of range after 2000 milliseconds, delete it from our list
-  , lookup_table      = require('./assets/Service-UUID-LUT.JSON');
+  , lookup_table      = require('./assets/Service-UUID-LUT.JSON')
+  , reverse_lut       = require('./assets/reverse_lut.json');
 
 server.on('request', function(req, res){
 	console.log(req.method + ' request');
@@ -21,13 +22,20 @@ server.on('request', function(req, res){
 				var id = args[1];
 				console.log('ID requested: ' + id);
 
-				var avail = getPeripheral(id);
-				console.log('Peripheral found successfully? ' + (avail == 0));
+				var requested_peripheral = discoveries[id];
 
-				if(avail == 0){
+				if(requested_peripheral && requested_peripheral["available"]){
 					console.log("> Available paths: " + discoveries[id]["paths"]);
 
-					console.log("> Path requested: " + args[2] + " - is valid: " + isValidPath(discoveries[id]["paths"].includes(args[2])));
+					var pathValidity = discoveries[id]["paths"].includes(args[2]);
+					console.log("> Path requested: " + args[2] + " - is valid: " + pathValidity);
+
+					if(pathValidity){
+						console.log("> Connecting to service.")
+
+						connectToService(discoveries[id], reverse_lut[args[2]]);
+					}
+
 				}
 				requestComplete(res, avail);
 			}else{
@@ -48,14 +56,6 @@ server.on('request', function(req, res){
 			break;
 	}
 });
-
-function getPeripheral(id){
-	var inRange;
-	inRange = discoveries[id];
-
-	if(inRange){ return 0; }
-	return 2;
-}
 
 function getInformation(id){
 	var requestedPeripheral = discoveries[id].peripheral;
@@ -103,6 +103,30 @@ function requestComplete(response, status){
 	response.end('\n');
 }
 
+function connectToService(peripheral, uuid){
+	peripheral["peripheral"].discoverServices([uuid], function(error, services){
+		//there should only be one service discovered
+		var serviceIndex = 0;
+
+		async.whilst(
+			function(){ return i < services.length; },
+			function(callback){
+				var service = services[serviceIndex];
+			    var serviceInfo = service.uuid;
+
+			    service.discoverCharacteristics([], function(error, characteristics){
+
+			    	//interacting with service characteristics here
+
+			    });
+
+			    serviceIndex++;
+			},
+			function(err){ requestedPeripheral.disconnect(); }
+		);
+	});
+}
+
 //Provide coap port
 server.listen(5683, function(){
 	console.log('Server started.')
@@ -140,9 +164,10 @@ noble.on('discover', function(peripheral){
 	if(!discoveries[id]){
 		var peripheralInfo = peripheral.id + ' (' + peripheral.advertisement.localName + ')';
 		discoveries[id] = {
-			peripheral: peripheral,
-			info: peripheralInfo,
-			paths: getInformation(peripheral.id)
+			"peripheral": peripheral,
+			"info": peripheralInfo,
+			"available": true,
+			"paths": getInformation(peripheral.id)
 		};
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
 	}
@@ -155,7 +180,7 @@ setInterval(function(){
 		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout)){
 			console.log('> Lost peripheral ' + discoveries[id].info);
 
-			delete(discoveries[id]);
+			discoveries[id]["available"] = false;
 		}
 	}
 }, proximity_timeout/2); //check list every 1000ms to see if devices have been lost
