@@ -1,0 +1,12 @@
+{
+	"name": "node-web-scrape",
+	"version": "0.0.1",
+	"description": "Scraping Bluetooth SIG tables",
+	"main": "server.js",
+	"author": "lfarrel6",
+	"dependencies": {
+		"express": "latest",
+		"request": "latest",
+		"cheerio": "latest"
+	}
+}

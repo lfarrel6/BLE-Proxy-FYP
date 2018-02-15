@@ -118,6 +118,8 @@ function connectToService(peripheral, uuid){
 
 			    	//interacting with service characteristics here
 
+			    	
+
 			    });
 
 			    serviceIndex++;
