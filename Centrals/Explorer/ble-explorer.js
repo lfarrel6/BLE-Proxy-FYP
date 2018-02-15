@@ -1,11 +1,13 @@
-var noble             = require('noble')
-  , coap              = require('coap')
-  , async             = require('async')
-  , server            = coap.createServer()
-  , discoveries       = []
-  , proximity_timeout = 2000 //if a discovery is out of range after 2000 milliseconds, delete it from our list
-  , lookup_table      = require('./assets/Service-UUID-LUT.JSON')
-  , reverse_lut       = require('./assets/reverse_lut.json');
+var noble                      = require('noble')
+  , coap                       = require('coap')
+  , async                      = require('async')
+  , server                     = coap.createServer()
+  , discoveries                = []
+  , proximity_timeout          = 2000 //if a discovery is out of range after 2000 milliseconds, delete it from our list
+  , services_lookup_table      = require('./assets/services-lut.json')
+  , reverse_services_lut       = require('./assets/reversed-services-lut.json')
+  , chars_lut                  = require('./assets/characteristic-lut.json')
+  , reverse_chars_lut          = require('./assets/reversed-characteristics-lut.json');
 
 server.on('request', function(req, res){
 	console.log(req.method + ' request');
@@ -117,9 +119,72 @@ function connectToService(peripheral, uuid){
 			    service.discoverCharacteristics([], function(error, characteristics){
 
 			    	//interacting with service characteristics here
+			    	var i = 0;
 
-			    	
+			    	async.whilst(
+			    		function(){
+			    			return (i < characteristics.length);
+			    		},
+			    		function(callback){
+			    			var characteristic = characteristics[i];
+			    			var characteristicInfo = ' ' + characteristic.uuid;
+			    			
+			    			if(characteristic.name){
+			    				characteristicInfo += ' (' + characteristic.name + ')';
+			    			}
 
+			    			async.series([
+			    				function(callback){
+			    					characteristic.discoverDescriptors(function(error, descriptors){
+			    						async.detect(
+			    							descriptors,
+			    							function(descriptor, callback){
+			    								if(descriptor.uuid === '2901'){
+			    									return callback(descriptor);
+			    								}else{
+			    									return callback();
+			    								}
+			    							},
+			    							function(userDescriptionDescriptor){
+			    								if(userDescriptionDescriptor){
+			    									userDescriptionDescriptor.readValue(function(error, data){
+			    										if(data){
+			    											characteristicInfo += ' (' + data.toString() + ')';
+			    										}
+			    										callback();
+			    									});
+			    								}else{
+			    									callback();
+			    								}
+			    							}
+			    						);
+			    					});
+			    				}, function(callback){
+			    					characteristicInfo += '\n 	properties  ' + characteristic.properties.join(', ');
+			    					if(characteristic.properties.indexOf('read') !== -1){
+			    						characteristic.read(function(error, data){
+			    							if(data){
+			    								var string = data.toString('ascii');
+
+			    								characteristicInfo += '\n 	value 	' + data.toString('hex') + '| \'' + string + '\'';
+			    							}
+			    							callback();
+			    						});
+			    					} else{
+			    						callback();
+			    					}
+			    				}, function(){
+			    					console.log(characteristicInfo);
+			    					i++;
+			    					callback();
+			    				}
+			    			]);
+			    		},
+			    		function(error){
+			    			i++;
+			    			callback();
+			    		}
+			    	);
 			    });
 
 			    serviceIndex++;
