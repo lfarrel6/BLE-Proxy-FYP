@@ -38,7 +38,7 @@ server.on('request', function(req, res){
 						if(pathValidity){
 							console.log("> Connecting to service.")
 
-							connectToService(discoveries[id], reverse_lut[args[2]]);
+							connectToService(discoveries[id].peripheral, reverse_lut[args[2]]);
 						}
 
 					}
@@ -68,41 +68,6 @@ server.on('request', function(req, res){
 });
 
 function isNumeric(str){ return !isNaN(str); }
-
-function getInformation(index){
-	var requestedPeripheral = discoveries[index].peripheral;
-
-	var url_paths = [];
-
-	requestedPeripheral.on('disconnect', function(){
-		console.log('> Requested Peripheral disconnect');
-		console.log('Peripheral disconnect @ ' + Date.now());
-	});
-
-	requestedPeripheral.connect(function(err){
-		requestedPeripheral.discoverServices([], function(error, services){
-			var i = 0, paths = 0;
-
-			async.whilst(
-				function(){ return i < services.length; },
-				function(callback){
-					var service = services[serviceIndex];
-			        var serviceInfo = service.uuid;
-
-			        if (lookup_table[service.uuid]) {
-			        	url_paths[paths] = lookup_table[service.uuid];
-			        	paths++;
-
-			        	console.log('> ' + lookup_table[service.uuid]);
-			        }
-			        i++;
-				},
-				function(err){ requestedPeripheral.disconnect(); }
-			);
-		});
-	});
-	return url_paths;
-}
 
 function requestComplete(response, status){
 	if(status == 0){
@@ -149,31 +114,72 @@ noble.on('discover', function(peripheral){
 
 	var id = peripheral.id;
 
-	/*
-	require restructuring of discoveries storage to allow for simpler indexing
-	look-up table + array vs array + search
-	*/
-
 
 	//if discovery is new
 	if(!discoveries_LUT[id]){
-		var peripheralInfo = peripheral.id + ' (' + peripheral.advertisement.localName + ')';
-		discoveries_LUT[id] = discoveries.length;
+		var peripheralInfo = id + ' (' + peripheral.advertisement.localName + ')';
+		
+		var this_index = discoveries.length;
+		discoveries_LUT[id] = this_index;
+
 		discoveries.push({
 			"peripheral": peripheral,
 			"info": peripheralInfo,
 			"available": true,
-			"paths": getInformation(peripheral.id)
+			"paths": getInformation(this_index),
+			"lastSeen": Date.now()
 		});
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
+
+		getCharacteristics( reverse_services_lut[discoveries[this_index].paths[0]] );
+
 	}
 
 	discoveries[ discoveries_LUT[id] ].lastSeen = Date.now();
 });
 
+function getInformation(index){
+	var requestedPeripheral = discoveries[index].peripheral;
+
+	var url_paths = [];
+
+	requestedPeripheral.on('disconnect', function(){
+		console.log('> Requested Peripheral disconnect');
+		console.log('Peripheral disconnect @ ' + Date.now());
+	});
+
+	requestedPeripheral.connect(function(err){
+		requestedPeripheral.discoverServices([], function(error, services){
+			var i = 0, paths = 0;
+
+			async.whilst(
+				function(){ return i < services.length; },
+				function(callback){
+					var service = services[serviceIndex];
+			        var serviceInfo = service.uuid;
+
+			        if (services_lookup_table[service.uuid]) {
+			        	url_paths[paths] = services_lookup_table[service.uuid];
+			        	paths++;
+
+			        	console.log('> ' + services_lookup_table[service.uuid]);
+			        }
+			        i++;
+				},
+				function(err){ requestedPeripheral.disconnect(); }
+			);
+		});
+	});
+	return url_paths;
+}
+
+/*
+peripheral: noble peripheral object with which connection is being sought
+uuid: desired services uuid
+*/
 function connectToService(peripheral, uuid){
 	var information = {};
-	peripheral["peripheral"].discoverServices([uuid], function(error, services){
+	peripheral.discoverServices([uuid], function(error, services){
 		//there should only be one service discovered
 		var serviceIndex = 0;
 
@@ -237,6 +243,7 @@ function connectToService(peripheral, uuid){
 
 			    								characteristicInfo += '\n 	value 	' + data.toString('hex') + '| \'' + string + '\'';
 			    							}
+			    							console.log(characteristicInfo);
 			    							callback();
 			    						});
 			    					} else{
@@ -259,9 +266,27 @@ function connectToService(peripheral, uuid){
 
 			    serviceIndex++;
 			},
-			function(err){ requestedPeripheral.disconnect(); }
+			function(err){ peripheral.disconnect(); }
 		);
 	});
+}
+
+/*
+peripheral: noble peripheral object with which connection is being sought
+uuid: desired services uuid
+*/
+function getCharacteristics(peripheral, uuid){
+	var info = [];
+	peripheral.discoverServices([uuid], function(error, services){
+		
+		for(var serviceIndex in services){
+			services[serviceIndex].discoverCharacteristics([], function(error, characteristics){
+				info.push(characteristics);
+			});
+		}
+	});
+
+	return info;
 }
 
 setInterval(function(){
