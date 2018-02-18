@@ -3,6 +3,7 @@ var noble                      = require('noble')
   , async                      = require('async')
   , server                     = coap.createServer()
   , discoveries                = []
+  , discoveries_LUT            = {}   //To allow for more simple indexing of peripherals using a lut to relate id's to indexes 
   , proximity_timeout          = 2000 //if a discovery is out of range after 2000 milliseconds, delete it from our list
   , services_lookup_table      = require('./assets/services-lut.json')
   , reverse_services_lut       = require('./assets/reversed-services-lut.json')
@@ -22,24 +23,31 @@ server.on('request', function(req, res){
 			if(args.length > 1){
 
 				var id = args[1];
-				console.log('ID requested: ' + id);
+				console.log('Index requested: ' + id);
 
-				var requested_peripheral = discoveries[id];
+				if(isNumeric(id)){
+					id = parseInt(id);
+					var requested_peripheral = discoveries[discoveries_LUT[id]];
 
-				if(requested_peripheral && requested_peripheral["available"]){
-					console.log("> Available paths: " + discoveries[id]["paths"]);
+					if(requested_peripheral && requested_peripheral["available"]){
+						console.log("> Available paths: " + discoveries[id]["paths"]);
 
-					var pathValidity = discoveries[id]["paths"].includes(args[2]);
-					console.log("> Path requested: " + args[2] + " - is valid: " + pathValidity);
+						var pathValidity = discoveries[id]["paths"].includes(args[2]);
+						console.log("> Path requested: " + args[2] + " - is valid: " + pathValidity);
 
-					if(pathValidity){
-						console.log("> Connecting to service.")
+						if(pathValidity){
+							console.log("> Connecting to service.")
 
-						connectToService(discoveries[id], reverse_lut[args[2]]);
+							connectToService(discoveries[id], reverse_lut[args[2]]);
+						}
+
 					}
+					requestComplete(res, avail);
+				} else{
+					console.log('Index ' + id + ' is not valid');
 
+					res.end('Invalid index provided');
 				}
-				requestComplete(res, avail);
 			}else{
 				// return all discoveries
 				for(var discovered in discoveries){
@@ -59,8 +67,10 @@ server.on('request', function(req, res){
 	}
 });
 
-function getInformation(id){
-	var requestedPeripheral = discoveries[id].peripheral;
+function isNumeric(str){ return !isNaN(str); }
+
+function getInformation(index){
+	var requestedPeripheral = discoveries[index].peripheral;
 
 	var url_paths = [];
 
@@ -105,16 +115,75 @@ function requestComplete(response, status){
 	response.end('\n');
 }
 
+
+//Provide coap port
+server.listen(5683, function(){
+	console.log('Server started.')
+});
+
+/**
+Noble code below - current functionality maintains a list of devices in proximity, removing after a 2000ms time interval if they haven't been seen 
+**/
+
+noble.on('stateChange', function(state){
+	console.log('State Change Event... ', state);
+	if(state === 'poweredOn'){
+		//Search for any uuid, don't accept duplicates
+		noble.startScanning([], false);
+	} else{ 
+		noble.stopScanning();
+	}
+});
+
+noble.on('scanStart', function(){
+	console.log('> Scanning...');
+});
+
+noble.on('scanStop', function(){
+	console.log('> Stopping Scanning...');
+});
+
+//discover function used to maintain list of surrounding devices (i.e. discoveries)
+noble.on('discover', function(peripheral){
+	console.log('> Peripheral Discovered');
+
+	var id = peripheral.id;
+
+	/*
+	require restructuring of discoveries storage to allow for simpler indexing
+	look-up table + array vs array + search
+	*/
+
+
+	//if discovery is new
+	if(!discoveries_LUT[id]){
+		var peripheralInfo = peripheral.id + ' (' + peripheral.advertisement.localName + ')';
+		discoveries_LUT[id] = discoveries.length;
+		discoveries.push({
+			"peripheral": peripheral,
+			"info": peripheralInfo,
+			"available": true,
+			"paths": getInformation(peripheral.id)
+		});
+		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
+	}
+
+	discoveries[ discoveries_LUT[id] ].lastSeen = Date.now();
+});
+
 function connectToService(peripheral, uuid){
+	var information = {};
 	peripheral["peripheral"].discoverServices([uuid], function(error, services){
 		//there should only be one service discovered
 		var serviceIndex = 0;
 
 		async.whilst(
-			function(){ return i < services.length; },
+			function(){ return serviceIndex < services.length; },
 			function(callback){
 				var service = services[serviceIndex];
 			    var serviceInfo = service.uuid;
+
+			    information[serviceInfo] = {};
 
 			    service.discoverCharacteristics([], function(error, characteristics){
 
@@ -175,6 +244,7 @@ function connectToService(peripheral, uuid){
 			    					}
 			    				}, function(){
 			    					console.log(characteristicInfo);
+			    					information[serviceInfo][i] = characteristicInfo;
 			    					i++;
 			    					callback();
 			    				}
@@ -193,54 +263,6 @@ function connectToService(peripheral, uuid){
 		);
 	});
 }
-
-//Provide coap port
-server.listen(5683, function(){
-	console.log('Server started.')
-});
-
-/**
-Noble code below - current functionality maintains a list of devices in proximity, removing after a 2000ms time interval if they haven't been seen 
-**/
-
-noble.on('stateChange', function(state){
-	console.log('State Change Event... ', state);
-	if(state === 'poweredOn'){
-		//Search for any uuid, don't accept duplicates
-		noble.startScanning([], false);
-	} else{ 
-		noble.stopScanning();
-	}
-});
-
-noble.on('scanStart', function(){
-	console.log('> Scanning...');
-});
-
-noble.on('scanStop', function(){
-	console.log('> Stopping Scanning...');
-});
-
-//discover function used to maintain list of surrounding devices (i.e. discoveries)
-noble.on('discover', function(peripheral){
-	console.log('> Peripheral Discovered');
-
-	var id = peripheral.id;
-
-	//if discovery is new
-	if(!discoveries[id]){
-		var peripheralInfo = peripheral.id + ' (' + peripheral.advertisement.localName + ')';
-		discoveries[id] = {
-			"peripheral": peripheral,
-			"info": peripheralInfo,
-			"available": true,
-			"paths": getInformation(peripheral.id)
-		};
-		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
-	}
-
-	discoveries[id].lastSeen = Date.now();
-});
 
 setInterval(function(){
 	for(var id in discoveries){
