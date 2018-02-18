@@ -23,9 +23,10 @@ server.on('request', function(req, res){
 			if(args.length > 1){
 
 				var id = args[1];
-				console.log('Index requested: ' + id);
+				console.log('> Index requested: ' + id);
 
 				if(isNumeric(id)){
+					console.log('> Numeric ID: ' + id);
 					id = parseInt(id);
 					var requested_peripheral = discoveries[discoveries_LUT[id]];
 
@@ -41,12 +42,15 @@ server.on('request', function(req, res){
 							connectToService(discoveries[id].peripheral, reverse_lut[args[2]]);
 						}
 
+					}else{
+						res.write('Peripheral unavailable');
 					}
-					requestComplete(res, avail);
+					requestComplete(res, 0);
 				} else{
 					console.log('Index ' + id + ' is not valid');
 
-					res.end('Invalid index provided');
+					res.write('Invalid index provided');
+					res.end();
 				}
 			}else{
 				// return all discoveries
