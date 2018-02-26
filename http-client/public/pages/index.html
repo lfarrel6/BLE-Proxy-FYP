@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Homepage</title>
+	<link rel="stylesheet" type="text/css" href="/scripts/style.css">
+	<link type="text/javascript" href="/scripts/index.js">
+</head>
+<body>
+
+<h1>ExpressJS Served Webpage</h1>
+
+<input type="text" name="ip-address" id="ip-entry" placeholder="Enter the COAP Server IP...">
+<button type="submit" onclick="ipSubmit()">Enter</button>
+
+</body>
+<script type="text/javascript">
+	
+function ipSubmit(){
+	var enteredIp = document.getElementById('ip-entry').value;
+	console.log(enteredIp + ' submitted');
+	
+	location.href = location.href + 'dashboard/' + enteredIp;
+}
+
+</script>
+</html>

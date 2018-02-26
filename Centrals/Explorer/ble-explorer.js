@@ -20,7 +20,12 @@ server.on('request', function(req, res){
 
 			var args = req.url.split('/');
 
-			if(args.length > 1){
+			if(args[1] === '.well-known' && args[2] === 'core'){
+				console.log('Well Known');
+				res.write('Observed Devices: ' + discoveries);
+				res.write('LUT: ' + discoveries_LUT);
+				requestComplete(res, 0);
+			}else if(args.length > 1){
 
 				var id = args[1];
 				console.log('> Index requested: ' + id);
@@ -46,7 +51,7 @@ server.on('request', function(req, res){
 						res.write('Peripheral unavailable');
 					}
 					requestComplete(res, 0);
-				} else{
+				}else{
 					console.log('Index ' + id + ' is not valid');
 
 					res.write('Invalid index provided');
