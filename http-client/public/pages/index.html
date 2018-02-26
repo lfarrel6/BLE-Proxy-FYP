@@ -2,15 +2,25 @@
 <html>
 <head>
 	<title>Homepage</title>
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans|Raleway|Roboto+Slab" rel="stylesheet">
 	<link rel="stylesheet" type="text/css" href="/scripts/style.css">
 	<link type="text/javascript" href="/scripts/index.js">
 </head>
 <body>
 
-<h1>ExpressJS Served Webpage</h1>
+<a class="floating-btn" id="github-btn" href="https://github.com/lfarrel6/BLE-Proxy-FYP"><img src="/assets/GitHub-Mark-64px.png" alt="View on GitHub!"></a>
 
-<input type="text" name="ip-address" id="ip-entry" placeholder="Enter the COAP Server IP...">
-<button type="submit" onclick="ipSubmit()">Enter</button>
+<div class="skewed">
+	<div class="container deskew">
+		<input type="text" id="ip-entry" name="ip-address"  placeholder="Enter the CoAP Server IP...">
+		<br>
+		<button type="submit" id="ip-submit" onclick="ipSubmit()">Enter</button>
+	</div>
+</div>
+<div class="info-box blue-bg">
+	<h1>About this service</h1>
+	<p class="info-block">This service proxies data from BLE sensors using a CoAP server. This webpage acts as a client to the CoAP server!<br>All you need to know is the IP address of the CoAP server. Entering it into the text field above will check if the server is <b>out there</b>.<br>If the server exists, you will be brought to the dashboard, which displays all of the BLE devices discovered by the CoAP server.</p>
+</div>
 
 </body>
 <script type="text/javascript">
@@ -18,7 +28,7 @@
 function ipSubmit(){
 	var enteredIp = document.getElementById('ip-entry').value;
 	console.log(enteredIp + ' submitted');
-	
+
 	location.href = location.href + 'dashboard/' + enteredIp;
 }
 
