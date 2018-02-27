@@ -10,12 +10,13 @@ app.use(cookieParser());
 app.use(function(req,res,next){
 	//console.log('cookies:' + req.cookies);
 
-	var randomNumber = Math.random().toString();
-	res.cookie('token',randomNumber,{maxAge:(1000*60*10)});
-	console.log('token created');
+	console.log('Cookies: ', req.cookies);
 
-	//console.log('cookies:' + req.cookies);
-	
+	var randomNumber = Math.random().toString();
+	if(!req.cookies.token){
+		res.cookie('token',randomNumber,{maxAge:(1000*60*10)});
+	}
+
 	next();
 });
 

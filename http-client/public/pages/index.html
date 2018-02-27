@@ -5,6 +5,7 @@
 	<link href="https://fonts.googleapis.com/css?family=Open+Sans|Raleway|Roboto+Slab" rel="stylesheet">
 	<link rel="stylesheet" type="text/css" href="/scripts/style.css">
 	<link type="text/javascript" href="/scripts/index.js">
+	<link rel="icon" href="/assets/favicon.png">
 </head>
 <body>
 
@@ -13,7 +14,7 @@
 <div class="skewed">
 	<div class="container deskew">
 		<input type="text" id="ip-entry" name="ip-address"  placeholder="Enter the CoAP Server IP...">
-		<br>
+		<p id='ip-err-msg'><span class="warning">⚠️</span>Enter a valid <a href="http://bit.ly/1ReCgWo">IPv4</a> or <a href="http://bit.ly/1Qkr8FK">IPv6</a> address.<span class="warning">⚠️</span></p>
 		<button type="submit" id="ip-submit" onclick="ipSubmit()">Enter</button>
 	</div>
 </div>
@@ -27,9 +28,19 @@
 	
 function ipSubmit(){
 	var enteredIp = document.getElementById('ip-entry').value;
+
+	var ipv4 = new RegExp("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$");
+	var ipv6 = new RegExp("^[\da-fA-F]{0,4}:[\da-fA-F]{0,4}:[\da-fA-F]{0,4}:[\da-fA-F]{0,4}:[\da-fA-F]{0,4}:[\da-fA-F]{0,4}:[\da-fA-F]{0,4}:[\da-fA-F]{0,4}$")
+
 	console.log(enteredIp + ' submitted');
 
-	location.href = location.href + 'dashboard/' + enteredIp;
+	if(ipv4.test(enteredIp) || ipv6.test(enteredIp) || enteredIp === 'localhost'){
+		document.getElementById('ip-err-msg').style.visibility = 'visible';
+		location.href = location.href + 'dashboard/' + enteredIp;
+	}else{
+		console.log('Invalid Entry. IPv4 or IPv6 expected.');
+		document.getElementById('ip-err-msg').style.visibility = 'visible';
+	}
 }
 
 </script>
