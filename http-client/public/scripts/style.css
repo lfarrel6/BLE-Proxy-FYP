@@ -14,17 +14,23 @@ body{
 	padding: 10px;
 }
 
-.skewed{
+.heading{
 	width:100%;
 	position: relative;
 	background-color:#fff;
+}
+
+.skewed{
 	transform: skew(0deg, -4deg) translateY(-145px);
 }
 
 .container{
 	padding:200px 250px;
-	transform: skew(0deg,4deg);
 	text-align:center;
+}
+
+.deskew{
+	transform: skew(0deg,4deg);
 }
 
 .info-box{

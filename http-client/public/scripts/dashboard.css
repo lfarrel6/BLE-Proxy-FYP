@@ -1,0 +1,19 @@
+
+.dash-heading{
+	width: 100%;
+	background-color: #fff;
+	text-align: center;
+	position: relative;
+}
+
+#dash-title{
+	margin:0;
+	padding: 150px 200px;
+}
+
+.dash-data-window{
+	color: #fff;
+}
+
+#observations{
+}

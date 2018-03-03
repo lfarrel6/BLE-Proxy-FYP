@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Proxy Dashboard</title>
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans|Raleway|Roboto+Slab" rel="stylesheet">
+	<link rel="stylesheet" type="text/css" href="/scripts/style.css">
+	<link rel="stylesheet" type="text/css" href="/scripts/dashboard.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<link rel="icon" href="/assets/favicon.png">
+</head>
+<body>
+	<a class="floating-btn" id="github-btn" href="https://github.com/lfarrel6/BLE-Proxy-FYP"><img src="/assets/GitHub-Mark-64px.png" alt="View on GitHub!"></a>
+
+	<div class="dash-heading">
+		<h1 id='dash-title'>CoAP Proxy Dashboard</h1>
+	</div>
+
+	<div class="dash-data-window">
+		<ul id="observations">
+			<li>Item1</li>
+			<li>Item2</li>
+		</ul>
+	</div>
+
+	<script type="text/javascript">
+		$(document).ready(function(){
+			console.log('Document loaded, fetching data');
+			var ip = location.href.split('/');
+			ip = ip[ip.length-1];
+			console.log(ip);
+			$.get(location.href+'/observations', {}, function(data){
+				console.log(data);
+				for(var datum in data.split('\n')){
+
+					var listItem = document.createElement('li');
+					document.getElementById('observations').appendChild(listItem);
+					listItem.innerHTML = datum;
+				}
+			});
+		});
+	</script>
+
+</body>
+</html>
