@@ -18,17 +18,7 @@ server.on('request', function(req, res){
 
 			get(req.url, res);
 
-			console.log('Request URL: ' + req.url);
-			console.log('Split URL: ' + req.url.split('/'));
-
-			var args = req.url.split('/');
-
-			if(args[1] === '.well-known' && args[2] === 'core'){
-				console.log('Well Known');
-				res.write('Observed Devices: ' + discoveries);
-				res.write('LUT: ' + discoveries_LUT);
-				requestComplete(res, 0);
-			}else if(args.length > 1){
+			if(args.length > 1){
 
 				var id = args[1];
 				console.log('> Index requested: ' + id);
@@ -84,7 +74,7 @@ function get(url, response){
 
 	//coap standard uri for important information on server
 	if(splitUrl.length > 2 && splitUrl[1] === '.well-known' && splitUrl[2] === "core"){
-		wellKnown(res);
+		wellKnown(response);
 	} else{
 		//process get requests for other devices
 		//URI structure: https://docs.google.com/document/d/1GqtmLli6Ir9sQcguDK4Bmhh9O_I5s4M740KlFlFNurI/
@@ -99,11 +89,24 @@ function get(url, response){
 			}else{
 				//service interaction
 				var service = splitUrl[2];
-
 				/*
+				service will contain a UUID
 				interact with service/characteristic
 				- requires service validation
 				*/
+
+				var deviceJSON = discoveries[deviceId];
+				if(deviceJSON.paths.includes(service)){
+
+					var characteristic = splitUrl[3];
+					//get request to a characteristic is a read
+					read(response,deviceJSON,service,characteristic);
+
+				}else{
+					response.write("service does not exist");
+					requestComplete(response, 1);
+				}
+
 			}
 		}
 	}
@@ -130,7 +133,7 @@ function requestComplete(response, status){
 	}else if(status == 1){
 		response.code = '4.01'; // message code complies with CoAP standards (client failure)
 	}else{
-		response.code = '5.01'; // message code complies with CoAP standards (client failure)
+		response.code = '5.01'; // message code complies with CoAP standards (server failure)
 	}
 	response.end('\n');
 }
@@ -181,7 +184,7 @@ noble.on('discover', function(peripheral){
 			"peripheral": peripheral,
 			"info": peripheralInfo,
 			"available": true,
-			//"paths": getInformation(this_index),
+			"paths": getInformation(this_index),
 			"lastSeen": Date.now()
 		});
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
@@ -215,7 +218,7 @@ function getInformation(index){
 			        var serviceInfo = service.uuid;
 
 			        if (services_lookup_table[service.uuid]) {
-			        	url_paths[paths] = services_lookup_table[service.uuid];
+			        	url_paths[paths] = service.uuid;
 			        	paths++;
 
 			        	console.log('> ' + services_lookup_table[service.uuid]);
@@ -343,6 +346,50 @@ function getCharacteristics(peripheral, uuid){
 	});
 
 	return info;
+}
+
+/*
+read give characteristic
+*/
+function read(response, deviceJSON, service, characteristic){
+	var peripheral = deviceJSON.peripheral;
+
+	peripheral.connect(function(conn_error){
+		peripheral.discoverServices([service],function(service_err, services){
+
+			if(service_err){
+				console.log("Error in connecting to service ", services_lookup_table[service]);
+				console.log(service_err);
+			}else{
+				
+				for(var service in services){
+					service.discoverCharacteristics([characteristic], function(character_err,characteristics){
+				
+						if(character_err){
+							console.log("Error connecting to characteristic ", chars_lut[characteristic]);
+							console.log(character_err);
+						}else{
+							var response_data;
+				
+							for(var c in characteristics){
+								c.read(function(err,data){
+									if(err){
+										console.log("Error reading characteristic ", chars_lut[characteristic]);
+										console.log(err);
+									}else{
+										response_data+=data;
+									}
+								});
+							}
+							//response.write(response_data);
+							response.json(response_data);
+							requestComplete(response,0);
+						}
+					});
+				}
+			}
+		})
+	});
 }
 
 setInterval(function(){
