@@ -15,6 +15,9 @@ server.on('request', function(req, res){
 
 	switch(req.method){
 		case 'GET':
+
+			get(req.url, res);
+
 			console.log('Request URL: ' + req.url);
 			console.log('Split URL: ' + req.url.split('/'));
 
@@ -76,6 +79,49 @@ server.on('request', function(req, res){
 	}
 });
 
+function get(url, response){
+	var splitUrl = url.split('/');
+
+	//coap standard uri for important information on server
+	if(splitUrl.length > 2 && splitUrl[1] === '.well-known' && splitUrl[2] === "core"){
+		wellKnown(res);
+	} else{
+		//process get requests for other devices
+		//URI structure: https://docs.google.com/document/d/1GqtmLli6Ir9sQcguDK4Bmhh9O_I5s4M740KlFlFNurI/
+
+		if(splitUrl.length > 2){
+
+			var deviceId = splitUrl[1];
+
+			if(splitUrl[2] == "exp"){
+				//explore this device
+				getInformation(deviceId);
+			}else{
+				//service interaction
+				var service = splitUrl[2];
+
+				/*
+				interact with service/characteristic
+				- requires service validation
+				*/
+			}
+		}
+	}
+}
+
+function wellKnown(res){
+	console.log('Well Known');
+
+	var modLUT = discoveries_LUT;
+
+	for(var discovery in discoveries_LUT){
+		modLUT[discovery] = discoveries[discoveries_LUT[discovery]];
+	}
+
+	res.json(modLUT);
+	requestComplete(res, 0);
+}
+
 function isNumeric(str){ return !isNaN(str); }
 
 function requestComplete(response, status){
@@ -135,12 +181,12 @@ noble.on('discover', function(peripheral){
 			"peripheral": peripheral,
 			"info": peripheralInfo,
 			"available": true,
-			"paths": getInformation(this_index),
+			//"paths": getInformation(this_index),
 			"lastSeen": Date.now()
 		});
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
 
-		getCharacteristics( reverse_services_lut[discoveries[this_index].paths[0]] );
+		//getCharacteristics( reverse_services_lut[discoveries[this_index].paths[0]] );
 
 	}
 
