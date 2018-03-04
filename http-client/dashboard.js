@@ -13,7 +13,7 @@ router.get('/:ip/observations',function(req,res){
 	ipAddr = req.params.ip;
 
 	var coapReq = coap.request('coap://'+ipAddr+':5683/.well-known/core');
-	//console.log(coapReq);
+	
 	var responseValue;
 
 	for(var i = 0; i < 25; i++){
@@ -25,8 +25,7 @@ router.get('/:ip/observations',function(req,res){
 
 		coapRes.on('data',function(chunk){
 			console.log(chunk);
-			//responseValue+=chunk + ' ';
-			//res.append(chunk);
+			responseValue+=chunk + ' ';
 		});
 		
 		coapRes.on('end', function(){

@@ -155,6 +155,7 @@ function getInformation(index){
 	requestedPeripheral.on('disconnect', function(){
 		console.log('> Requested Peripheral disconnect');
 		console.log('Peripheral disconnect @ ' + Date.now());
+		noble.startScanning();
 	});
 
 	requestedPeripheral.connect(function(err){

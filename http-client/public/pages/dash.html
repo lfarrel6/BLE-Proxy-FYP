@@ -16,9 +16,8 @@
 	</div>
 
 	<div class="dash-data-window">
+		<img src="/assets/loading.gif" alt="loading" id="loading-gif">
 		<ul id="observations">
-			<li>Item1</li>
-			<li>Item2</li>
 		</ul>
 	</div>
 
@@ -29,6 +28,9 @@
 			ip = ip[ip.length-1];
 			console.log(ip);
 			$.get(location.href+'/observations', {}, function(data){
+				document.getElementById('loading-gif').style.padding = 0;
+				document.getElementById('loading-gif').style.visibility = 'hidden';
+
 				console.log(data);
 				for(var datum in data.split('\n')){
 
