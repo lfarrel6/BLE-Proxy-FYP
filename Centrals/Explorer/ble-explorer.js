@@ -214,8 +214,7 @@ function getInformation(index){
 			async.whilst(
 				function(){ return i < services.length; },
 				function(callback){
-					var service = services[serviceIndex];
-			        var serviceInfo = service.uuid;
+					var service = services[i];
 
 			        if (services_lookup_table[service.uuid]) {
 			        	url_paths[paths] = service.uuid;
@@ -224,12 +223,18 @@ function getInformation(index){
 			        	console.log('> ' + services_lookup_table[service.uuid]);
 			        }
 			        i++;
+			        callback(null, url_paths);
 				},
-				function(err){ requestedPeripheral.disconnect(); }
+				function(err, results){ 
+					if(err){
+						requestedPeripheral.disconnect();
+					}else{
+						return results;
+					}
+				}
 			);
 		});
 	});
-	return url_paths;
 }
 
 /*
@@ -361,9 +366,13 @@ function read(response, deviceJSON, service, characteristic){
 				console.log("Error in connecting to service ", services_lookup_table[service]);
 				console.log(service_err);
 			}else{
-				
-				for(var service in services){
-					service.discoverCharacteristics([characteristic], function(character_err,characteristics){
+				var i = 0;
+				async.whilst(
+					function(){ return i < services.length; },
+					function(callback){
+						var service = services[i];
+
+						service.discoverCharacteristics([characteristic], function(character_err,characteristics){
 				
 						if(character_err){
 							console.log("Error connecting to characteristic ", chars_lut[characteristic]);
@@ -371,24 +380,48 @@ function read(response, deviceJSON, service, characteristic){
 						}else{
 							var response_data;
 				
-							for(var c in characteristics){
-								c.read(function(err,data){
+							var i = 0;
+
+							async.whilst(
+								function(){ return i < characteristics.length; },
+								function(callback){
+									var c = characteristics[i];
+
+									c.read(function(err,data){
+										if(err){
+											console.log("Error reading characteristic ", chars_lut[c]);
+											console.log(err);
+											
+											callback(err, null);
+										}else{
+											response_data+=data;
+											callback(null,response_data);
+										}
+									});
+								},
+								function(err, results){
 									if(err){
-										console.log("Error reading characteristic ", chars_lut[characteristic]);
-										console.log(err);
+										console.log("Error during Characteristic read\n", err);
+										response.send(err,1);
 									}else{
-										response_data+=data;
+										response.json(response_data);
+										requestComplete(response,0);
 									}
-								});
-							}
-							//response.write(response_data);
-							response.json(response_data);
+								}
+							);
+						}
+					},
+					function(err,results){
+						if(err){
+							console.log(err);
+						}else{
+							response.json(results);
 							requestComplete(response,0);
 						}
-					});
-				}
+					}
+				);
 			}
-		})
+		});
 	});
 }
 
