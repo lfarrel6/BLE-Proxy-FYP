@@ -241,103 +241,6 @@ function getInformation(index){
 peripheral: noble peripheral object with which connection is being sought
 uuid: desired services uuid
 */
-function connectToService(peripheral, uuid){
-	var information = {};
-	peripheral.discoverServices([uuid], function(error, services){
-		//there should only be one service discovered
-		var serviceIndex = 0;
-
-		async.whilst(
-			function(){ return serviceIndex < services.length; },
-			function(callback){
-				var service = services[serviceIndex];
-			    var serviceInfo = service.uuid;
-
-			    information[serviceInfo] = {};
-
-			    service.discoverCharacteristics([], function(error, characteristics){
-
-			    	//interacting with service characteristics here
-			    	var i = 0;
-
-			    	async.whilst(
-			    		function(){	return (i < characteristics.length); },
-			    		function(callback){
-			    			var characteristic = characteristics[i];
-			    			var characteristicInfo = ' ' + characteristic.uuid;
-			    			
-			    			if(characteristic.name){
-			    				characteristicInfo += ' (' + characteristic.name + ')';
-			    			}
-
-			    			async.series([
-			    				function(callback){
-			    					characteristic.discoverDescriptors(function(error, descriptors){
-			    						async.detect(
-			    							descriptors,
-			    							function(descriptor, callback){
-			    								if(descriptor.uuid === '2901'){
-			    									return callback(descriptor);
-			    								}else{
-			    									return callback();
-			    								}
-			    							},
-			    							function(userDescriptionDescriptor){
-			    								if(userDescriptionDescriptor){
-			    									userDescriptionDescriptor.readValue(function(error, data){
-			    										if(data){
-			    											characteristicInfo += ' (' + data.toString() + ')';
-			    										}
-			    										callback();
-			    									});
-			    								}else{
-			    									callback();
-			    								}
-			    							}
-			    						);
-			    					});
-			    				}, function(callback){
-			    					characteristicInfo += '\n 	properties  ' + characteristic.properties.join(', ');
-			    					if(characteristic.properties.indexOf('read') !== -1){
-			    						characteristic.read(function(error, data){
-			    							if(data){
-			    								var string = data.toString('ascii');
-
-			    								characteristicInfo += '\n 	value 	' + data.toString('hex') + '| \'' + string + '\'';
-			    							}
-			    							console.log(characteristicInfo);
-			    							callback();
-			    						});
-			    					} else{
-			    						callback();
-			    					}
-			    				}, function(){
-			    					console.log(characteristicInfo);
-			    					information[serviceInfo][i] = characteristicInfo;
-			    					i++;
-			    					callback();
-			    				}
-			    			]);
-			    			i++;
-			    		},
-			    		function(error){
-			    			i++;
-			    			callback();
-			    		}
-			    	);
-			    });
-
-			    serviceIndex++;
-			},
-			function(err){ peripheral.disconnect(); }
-		);
-	});
-}
-
-/*
-peripheral: noble peripheral object with which connection is being sought
-uuid: desired services uuid
-*/
 function getCharacteristics(peripheral, uuid){
 	var info = [];
 	peripheral.discoverServices([uuid], function(error, services){
@@ -468,3 +371,128 @@ setInterval(function(){
 		}
 	}
 }, proximity_timeout/2); //check list every 1000ms to see if devices have been lost
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+peripheral: noble peripheral object with which connection is being sought
+uuid: desired services uuid
+*/
+
+// connectToService replaced by getCharacteristics
+
+/*function connectToService(peripheral, uuid){
+	var information = {};
+	peripheral.discoverServices([uuid], function(error, services){
+		//there should only be one service discovered
+		var serviceIndex = 0;
+
+		async.whilst(
+			function(){ return serviceIndex < services.length; },
+			function(callback){
+				var service = services[serviceIndex];
+			    var serviceInfo = service.uuid;
+
+			    information[serviceInfo] = {};
+
+			    service.discoverCharacteristics([], function(error, characteristics){
+
+			    	//interacting with service characteristics here
+			    	var i = 0;
+
+			    	async.whilst(
+			    		function(){	return (i < characteristics.length); },
+			    		function(callback){
+			    			var characteristic = characteristics[i];
+			    			var characteristicInfo = ' ' + characteristic.uuid;
+			    			
+			    			if(characteristic.name){
+			    				characteristicInfo += ' (' + characteristic.name + ')';
+			    			}
+
+			    			async.series([
+			    				function(callback){
+			    					characteristic.discoverDescriptors(function(error, descriptors){
+			    						async.detect(
+			    							descriptors,
+			    							function(descriptor, callback){
+			    								if(descriptor.uuid === '2901'){
+			    									return callback(descriptor);
+			    								}else{
+			    									return callback();
+			    								}
+			    							},
+			    							function(userDescriptionDescriptor){
+			    								if(userDescriptionDescriptor){
+			    									userDescriptionDescriptor.readValue(function(error, data){
+			    										if(data){
+			    											characteristicInfo += ' (' + data.toString() + ')';
+			    										}
+			    										callback();
+			    									});
+			    								}else{
+			    									callback();
+			    								}
+			    							}
+			    						);
+			    					});
+			    				}, function(callback){
+			    					characteristicInfo += '\n 	properties  ' + characteristic.properties.join(', ');
+			    					if(characteristic.properties.indexOf('read') !== -1){
+			    						characteristic.read(function(error, data){
+			    							if(data){
+			    								var string = data.toString('ascii');
+
+			    								characteristicInfo += '\n 	value 	' + data.toString('hex') + '| \'' + string + '\'';
+			    							}
+			    							console.log(characteristicInfo);
+			    							callback();
+			    						});
+			    					} else{
+			    						callback();
+			    					}
+			    				}, function(){
+			    					console.log(characteristicInfo);
+			    					information[serviceInfo][i] = characteristicInfo;
+			    					i++;
+			    					callback();
+			    				}
+			    			]);
+			    			i++;
+			    		},
+			    		function(error){
+			    			i++;
+			    			callback();
+			    		}
+			    	);
+			    });
+
+			    serviceIndex++;
+			},
+			function(err){ peripheral.disconnect(); }
+		);
+	});
+}*/
