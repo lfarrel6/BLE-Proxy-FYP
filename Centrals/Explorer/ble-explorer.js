@@ -261,9 +261,7 @@ function connectToService(peripheral, uuid){
 			    	var i = 0;
 
 			    	async.whilst(
-			    		function(){
-			    			return (i < characteristics.length);
-			    		},
+			    		function(){	return (i < characteristics.length); },
 			    		function(callback){
 			    			var characteristic = characteristics[i];
 			    			var characteristicInfo = ' ' + characteristic.uuid;
@@ -320,6 +318,7 @@ function connectToService(peripheral, uuid){
 			    					callback();
 			    				}
 			    			]);
+			    			i++;
 			    		},
 			    		function(error){
 			    			i++;
@@ -343,14 +342,47 @@ function getCharacteristics(peripheral, uuid){
 	var info = [];
 	peripheral.discoverServices([uuid], function(error, services){
 		
-		for(var serviceIndex in services){
-			services[serviceIndex].discoverCharacteristics([], function(error, characteristics){
-				info.push(characteristics);
-			});
-		}
-	});
+		var i = 0;
 
-	return info;
+		async.whilst(
+			function(){ return i < services.length; },
+			function(callback){
+				var service = services[i];
+
+				service.discoverCharacteristics([], function(error, characteristics){
+
+					var j = 0;
+
+					async.whilst(
+						function(){ return j < characteristics.length; },
+						function(callback){
+							var characteristic = characteristics[j];
+
+							callback(null, info.push(characteristic));
+							j++;
+						},
+						function(err,results){
+							if(err){
+								console.log(err);
+							}else{
+								return results;
+							}
+						}
+					);
+
+				});
+				callback(null,info);
+				i++;
+			},
+			function(err,results){
+				if(err){
+					console.log(err);
+				}else{
+					return results;
+				}
+			}
+		);
+	});
 }
 
 /*
@@ -380,12 +412,12 @@ function read(response, deviceJSON, service, characteristic){
 						}else{
 							var response_data;
 				
-							var i = 0;
+							var j = 0;
 
 							async.whilst(
-								function(){ return i < characteristics.length; },
+								function(){ return j < characteristics.length; },
 								function(callback){
-									var c = characteristics[i];
+									var c = characteristics[j];
 
 									c.read(function(err,data){
 										if(err){
@@ -398,6 +430,7 @@ function read(response, deviceJSON, service, characteristic){
 											callback(null,response_data);
 										}
 									});
+									j++;
 								},
 								function(err, results){
 									if(err){
@@ -410,6 +443,7 @@ function read(response, deviceJSON, service, characteristic){
 								}
 							);
 						}
+						i++;
 					},
 					function(err,results){
 						if(err){
