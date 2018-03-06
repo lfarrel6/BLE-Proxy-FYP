@@ -98,9 +98,15 @@ function get(url, response){
 				var deviceJSON = discoveries[deviceId];
 				if(deviceJSON.paths.includes(service)){
 
-					var characteristic = splitUrl[3];
-					//get request to a characteristic is a read
-					read(response,deviceJSON,service,characteristic);
+					if(deviceJSON.inRange){
+						var characteristic = splitUrl[3];
+						//get request to a characteristic is a read
+					
+						read(response,deviceJSON,service,characteristic);
+					}else{
+						response.write("Device has gone out of range");
+						requestComplete(response,2);
+					}
 
 				}else{
 					response.write("service does not exist");
@@ -108,6 +114,9 @@ function get(url, response){
 				}
 
 			}
+		}else{
+			response.write("Invalid URI");
+			requestComplete(response,1);
 		}
 	}
 }
@@ -145,7 +154,11 @@ server.listen(5683, function(){
 });
 
 /**
-Noble code below - current functionality maintains a list of devices in proximity, removing after a 2000ms time interval if they haven't been seen 
+
+|--------------------------------------------------------------------------------------------------------------------------------------------------|
+|Noble code below - current functionality maintains a list of devices in proximity, removing after a 2000ms time interval if they haven't been seen|
+|--------------------------------------------------------------------------------------------------------------------------------------------------|
+
 **/
 
 noble.on('stateChange', function(state){
@@ -183,7 +196,7 @@ noble.on('discover', function(peripheral){
 		discoveries.push({
 			"peripheral": peripheral,
 			"info": peripheralInfo,
-			"available": true,
+			"inRange": true,
 			"paths": getInformation(this_index),
 			"lastSeen": Date.now()
 		});
@@ -367,7 +380,7 @@ setInterval(function(){
 		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout)){
 			console.log('> Lost peripheral ' + discoveries[id].info);
 
-			discoveries[id]["available"] = false;
+			discoveries[id]["inRange"] = false;
 		}
 	}
 }, proximity_timeout/2); //check list every 1000ms to see if devices have been lost
