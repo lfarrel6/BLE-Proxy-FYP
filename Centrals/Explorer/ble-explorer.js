@@ -271,23 +271,22 @@ function getCharacteristics(peripheral, uuid){
 
 					async.whilst(
 						function(){ return j < characteristics.length; },
-						function(callback){
+						function(nested_callback){
 							var characteristic = characteristics[j];
 
-							callback(null, info.push(characteristic));
+							nested_callback(null, info.push(characteristic));
 							j++;
 						},
 						function(err,results){
 							if(err){
-								console.log(err);
+								callback(err);
 							}else{
-								return results;
+								callback(null,results);
 							}
 						}
 					);
 
 				});
-				callback(null,info);
 				i++;
 			},
 			function(err,results){
@@ -322,44 +321,44 @@ function read(response, deviceJSON, service, characteristic){
 
 						service.discoverCharacteristics([characteristic], function(character_err,characteristics){
 				
-						if(character_err){
-							console.log("Error connecting to characteristic ", chars_lut[characteristic]);
-							console.log(character_err);
-						}else{
-							var response_data;
+							if(character_err){
+								console.log("Error connecting to characteristic ", chars_lut[characteristic]);
+								console.log(character_err);
+							}else{
+								var response_data;
 				
-							var j = 0;
+								var j = 0;
 
-							async.whilst(
-								function(){ return j < characteristics.length; },
-								function(callback){
-									var c = characteristics[j];
+								async.whilst(
+									function(){ return j < characteristics.length; },
+									function(nested_callback){
+										var c = characteristics[j];
 
-									c.read(function(err,data){
-										if(err){
-											console.log("Error reading characteristic ", chars_lut[c]);
-											console.log(err);
+										c.read(function(err,data){
+											if(err){
+												console.log("Error reading characteristic ", chars_lut[c]);
+												console.log(err);
 											
-											callback(err, null);
+												nested_callback(err);
+											}else{
+												response_data+=data;
+												nested_callback(null,response_data);
+											}
+										});
+										j++;
+									},
+									function(err, results){
+										if(err){
+											console.log("Error during Characteristic read\n", err);
+											callback(err);
 										}else{
-											response_data+=data;
-											callback(null,response_data);
+											callback(null,results);
 										}
-									});
-									j++;
-								},
-								function(err, results){
-									if(err){
-										console.log("Error during Characteristic read\n", err);
-										response.send(err,1);
-									}else{
-										response.json(response_data);
-										requestComplete(response,0);
 									}
-								}
-							);
+								);
+							}
+							i++;
 						}
-						i++;
 					},
 					function(err,results){
 						if(err){
