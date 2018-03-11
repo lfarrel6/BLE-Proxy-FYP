@@ -6,6 +6,7 @@
 	<link rel="stylesheet" type="text/css" href="/scripts/style.css">
 	<link rel="stylesheet" type="text/css" href="/scripts/dashboard.css">
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script type="text/javascript" src="/scripts/dash-utilities.js"></script>
 	<link rel="icon" href="/assets/favicon.png">
 </head>
 <body>
@@ -27,18 +28,35 @@
 			var ip = location.href.split('/');
 			ip = ip[ip.length-1];
 			console.log(ip);
-			$.get(location.href+'/observations', {}, function(data){
+			// GET request to /observations triggers a well known request to the CoAP proxy
+			$.get(location.href+'/observations', null, function(data){
 				document.getElementById('loading-gif').style.padding = 0;
 				document.getElementById('loading-gif').style.visibility = 'hidden';
 
 				console.log(data);
-				for(var datum in data.split('\n')){
+				for(var datum in data){
 
 					var listItem = document.createElement('li');
+					listItem.setAttribute('id',datum);
+					listItem.className = "peripheral-li";
 					document.getElementById('observations').appendChild(listItem);
+
 					listItem.innerHTML = datum;
+
+					if(listItem.addEventListener){
+						listItem.addEventListener('click', function(){
+							peripheralSelected(datum);
+						}, false);
+					}else{
+						//legacy support (IE < 9)
+						if(listItem.attachEvent){
+							listItem.attachEvent('click', function(){
+								peripheralSelected(datum);
+							});
+						}
+					}
 				}
-			});
+			}, 'json');
 		});
 	</script>
 

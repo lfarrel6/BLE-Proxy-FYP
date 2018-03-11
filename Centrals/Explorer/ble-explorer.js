@@ -17,47 +17,6 @@ server.on('request', function(req, res){
 		case 'GET':
 
 			get(req.url, res);
-
-			if(args.length > 1){
-
-				var id = args[1];
-				console.log('> Index requested: ' + id);
-
-				if(isNumeric(id)){
-					console.log('> Numeric ID: ' + id);
-					id = parseInt(id);
-					var requested_peripheral = discoveries[discoveries_LUT[id]];
-
-					if(requested_peripheral && requested_peripheral["available"]){
-						console.log("> Available paths: " + discoveries[id]["paths"]);
-
-						var pathValidity = discoveries[id]["paths"].includes(args[2]);
-						console.log("> Path requested: " + args[2] + " - is valid: " + pathValidity);
-
-						if(pathValidity){
-							console.log("> Connecting to service.")
-
-							connectToService(discoveries[id].peripheral, reverse_lut[args[2]]);
-						}
-
-					}else{
-						res.write('Peripheral unavailable');
-					}
-					requestComplete(res, 0);
-				}else{
-					console.log('Index ' + id + ' is not valid');
-
-					res.write('Invalid index provided');
-					res.end();
-				}
-			}else{
-				// return all discoveries
-				for(var discovered in discoveries){
-					res.write(discovered.info + '\n');
-				}
-				requestComplete(res, 0);
-			}
-
 			break;
 		//case    'PUT':
 		//case   'POST':
@@ -85,7 +44,7 @@ function get(url, response){
 
 			if(splitUrl[2] == "exp"){
 				//explore this device
-				getInformation(deviceId);
+				getServices(deviceId);
 			}else{
 				//service interaction
 				var service = splitUrl[2];
@@ -124,10 +83,12 @@ function get(url, response){
 function wellKnown(res){
 	console.log('Well Known');
 
-	var modLUT = discoveries_LUT;
+	var modLUT = {};
 
+	//discovery will hold the json keys (the peripheral ids)
 	for(var discovery in discoveries_LUT){
-		modLUT[discovery] = discoveries[discoveries_LUT[discovery]];
+		//modLUT will be id:jsonInfo from noble discovery
+		modLUT[discovery] = discoveries[ discoveries_LUT[discovery] ];
 	}
 
 	res.json(modLUT);
@@ -197,7 +158,7 @@ noble.on('discover', function(peripheral){
 			"peripheral": peripheral,
 			"info": peripheralInfo,
 			"inRange": true,
-			"paths": getInformation(this_index),
+			"paths": getServices(this_index),
 			"lastSeen": Date.now()
 		});
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
@@ -209,7 +170,7 @@ noble.on('discover', function(peripheral){
 	discoveries[ discoveries_LUT[id] ].lastSeen = Date.now();
 });
 
-function getInformation(index){
+function getServices(index){
 	var requestedPeripheral = discoveries[index].peripheral;
 
 	var url_paths = [];

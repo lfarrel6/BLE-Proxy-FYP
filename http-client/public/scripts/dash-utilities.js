@@ -1,0 +1,3 @@
+function peripheralSelected(key){
+	
+}
