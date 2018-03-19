@@ -25,7 +25,7 @@ router.get('/:ip/observations',function(req,res){
 
 		coapRes.on('data',function(chunk){
 			console.log(chunk);
-			responseValue+=chunk + ' ';
+			//responseValue+=chunk + ' ';
 		});
 		
 		coapRes.on('end', function(){
@@ -37,7 +37,7 @@ router.get('/:ip/observations',function(req,res){
 	});
 	coapReq.end();
 	console.log('request finished\n'+responseValue);
-	res.send(responseValue);
+	//res.send(responseValue);
 });
 
 module.exports = router;

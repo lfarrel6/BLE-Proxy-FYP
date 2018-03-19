@@ -158,9 +158,10 @@ noble.on('discover', function(peripheral){
 			"peripheral": peripheral,
 			"info": peripheralInfo,
 			"inRange": true,
-			"paths": getServices(this_index),
+			"paths": [],
 			"lastSeen": Date.now()
 		});
+		discoveries[discoveries.length-1].paths = getServices(this_index);
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
 
 		//getCharacteristics( reverse_services_lut[discoveries[this_index].paths[0]] );
@@ -177,7 +178,7 @@ function getServices(index){
 
 	requestedPeripheral.on('disconnect', function(){
 		console.log('> Requested Peripheral disconnect');
-		console.log('Peripheral disconnect @ ' + Date.now());
+		console.log('Peripheral disconnect @ ' + new Date());
 		noble.startScanning();
 	});
 
@@ -275,8 +276,8 @@ function read(response, deviceJSON, service, characteristic){
 				console.log(service_err);
 			}else{
 				var i = 0;
-				async.whilst(
-					function(){ return i < services.length; },
+				async.whilst( 
+					function(){ return i < services.length; }, 
 					function(callback){
 						var service = services[i];
 
@@ -315,11 +316,10 @@ function read(response, deviceJSON, service, characteristic){
 										}else{
 											callback(null,results);
 										}
-									}
-								);
+									});
 							}
 							i++;
-						}
+						})
 					},
 					function(err,results){
 						if(err){
@@ -328,8 +328,7 @@ function read(response, deviceJSON, service, characteristic){
 							response.json(results);
 							requestComplete(response,0);
 						}
-					}
-				);
+					});
 			}
 		});
 	});
@@ -337,7 +336,7 @@ function read(response, deviceJSON, service, characteristic){
 
 setInterval(function(){
 	for(var id in discoveries){
-		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout)){
+		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout) && discoveries[id]["inRange"]){
 			console.log('> Lost peripheral ' + discoveries[id].info);
 
 			discoveries[id]["inRange"] = false;
