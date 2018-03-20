@@ -4,7 +4,7 @@ var noble                      = require('noble')
   , server                     = coap.createServer()
   , discoveries                = []
   , discoveries_LUT            = {}   //To allow for more simple indexing of peripherals using a lut to relate id's to indexes 
-  , proximity_timeout          = 2000 //if a discovery is out of range after 2000 milliseconds, delete it from our list
+  , proximity_timeout          = 5000 //if a discovery is out of range after 2000 milliseconds, delete it from our list
   , services_lookup_table      = require('./assets/services-lut.json')
   , reverse_services_lut       = require('./assets/reversed-services-lut.json')
   , chars_lut                  = require('./assets/characteristic-lut.json')
@@ -55,7 +55,7 @@ function get(url, response){
 				*/
 
 				var deviceJSON = discoveries[deviceId];
-				if(deviceJSON.paths.includes(service)){
+				if(discoveries[deviceId] && deviceJSON.paths.includes(service)){
 
 					if(deviceJSON.inRange){
 						var characteristic = splitUrl[3];
@@ -90,9 +90,9 @@ function wellKnown(res){
 		//modLUT will be id:jsonInfo from noble discovery
 		modLUT[discovery] = discoveries[ discoveries_LUT[discovery] ];
 	}
-
+	res.code = '2.01';
 	res.json(modLUT);
-	requestComplete(res, 0);
+	//requestComplete(res, 0);
 }
 
 function isNumeric(str){ return !isNaN(str); }
@@ -142,13 +142,12 @@ noble.on('scanStop', function(){
 
 //discover function used to maintain list of surrounding devices (i.e. discoveries)
 noble.on('discover', function(peripheral){
-	console.log('> Peripheral Discovered');
-
 	var id = peripheral.id;
 
 
 	//if discovery is new
 	if(!discoveries_LUT[id]){
+
 		var peripheralInfo = id + ' (' + peripheral.advertisement.localName + ')';
 		
 		var this_index = discoveries.length;
@@ -158,7 +157,6 @@ noble.on('discover', function(peripheral){
 			"peripheral": peripheral,
 			"info": peripheralInfo,
 			"inRange": true,
-			"paths": [],
 			"lastSeen": Date.now()
 		});
 		discoveries[discoveries.length-1].paths = getServices(this_index);

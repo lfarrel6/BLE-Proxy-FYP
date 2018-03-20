@@ -16,22 +16,18 @@ router.get('/:ip/observations',function(req,res){
 	
 	var responseValue;
 
-	for(var i = 0; i < 25; i++){
-		responseValue+=''+i+'\n';
-		console.log(i);
-	}
-
 	coapReq.on('response',function(coapRes){
 
+		coapRes.setEncoding('utf8');
+
 		coapRes.on('data',function(chunk){
-			console.log(chunk);
-			//responseValue+=chunk + ' ';
+			console.log('BODY: ' + chunk);
+			responseValue+=chunk;
 		});
 		
 		coapRes.on('end', function(){
-			console.log('message complete: ', responseValue);
-			console.log('Response:', res);
-			res.end();
+			res.json(responseValue);
+			//res.end();
 		});
 
 	});

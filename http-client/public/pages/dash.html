@@ -36,6 +36,9 @@
 				console.log(data);
 				for(var datum in data){
 
+					//data is a json
+					//{id: {info json}}
+
 					var listItem = document.createElement('li');
 					listItem.setAttribute('id',datum);
 					listItem.className = "peripheral-li";
