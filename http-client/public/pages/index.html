@@ -11,8 +11,8 @@
 
 <a class="floating-btn" id="github-btn" href="https://github.com/lfarrel6/BLE-Proxy-FYP"><img src="/assets/GitHub-Mark-64px.png" alt="View on GitHub!"></a>
 
-<div class="heading skewed">
-	<div class="container deskew">
+<div class="heading">
+	<div class="container">
 		<input type="text" id="ip-entry" name="ip-address"  placeholder="Enter the CoAP Server IP...">
 		<p id='ip-err-msg'><span class="warning">⚠️</span>Enter a valid <a href="http://bit.ly/1ReCgWo">IPv4</a> or <a href="http://bit.ly/1Qkr8FK">IPv6</a> address.<span class="warning">⚠️</span></p>
 		<button type="submit" id="ip-submit" onclick="ipSubmit()">Enter</button>
@@ -34,7 +34,7 @@ function ipSubmit(){
 
 	console.log(enteredIp + ' submitted');
 
-	if(ipv4.test(enteredIp) || ipv6.test(enteredIp) || enteredIp === 'localhost'){
+	if(ipv4.test(enteredIp) || ipv6.test(enteredIp) || enteredIp == 'localhost'){
 		document.getElementById('ip-err-msg').style.visibility = 'visible';
 		location.href = location.href + 'dashboard/' + enteredIp;
 	}else{

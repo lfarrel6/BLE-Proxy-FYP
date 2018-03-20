@@ -1,6 +1,7 @@
 var noble                      = require('noble')
   , coap                       = require('coap')
   , async                      = require('async')
+  , fs                         = require('fs')
   , server                     = coap.createServer()
   , discoveries                = []
   , discoveries_LUT            = {}   //To allow for more simple indexing of peripherals using a lut to relate id's to indexes 
@@ -15,8 +16,10 @@ server.on('request', function(req, res){
 
 	switch(req.method){
 		case 'GET':
-
-			get(req.url, res);
+			console.log('~GET REQUEST RECEIVED');
+			res.write( get(req.url, res) );
+			console.log('~OUTGOING RES PAYLOAD: ' + res.payload);
+			res.end();
 			break;
 		//case    'PUT':
 		//case   'POST':
@@ -33,7 +36,9 @@ function get(url, response){
 
 	//coap standard uri for important information on server
 	if(splitUrl.length > 2 && splitUrl[1] === '.well-known' && splitUrl[2] === "core"){
-		wellKnown(response);
+		console.log('~WELL KNOWN REQUEST');
+		var information = wellKnown(response);
+		console.log('~WELL KNOWN OUTPUT: ' + JSON.stringify(information));
 	} else{
 		//process get requests for other devices
 		//URI structure: https://docs.google.com/document/d/1GqtmLli6Ir9sQcguDK4Bmhh9O_I5s4M740KlFlFNurI/
@@ -44,7 +49,7 @@ function get(url, response){
 
 			if(splitUrl[2] == "exp"){
 				//explore this device
-				getServices(deviceId);
+				getServices(deviceId, response);
 			}else{
 				//service interaction
 				var service = splitUrl[2];
@@ -81,18 +86,38 @@ function get(url, response){
 }
 
 function wellKnown(res){
-	console.log('Well Known');
 
+	console.log('~WELL KNOWN PROCESSING');
 	var modLUT = {};
 
-	//discovery will hold the json keys (the peripheral ids)
-	for(var discovery in discoveries_LUT){
-		//modLUT will be id:jsonInfo from noble discovery
-		modLUT[discovery] = discoveries[ discoveries_LUT[discovery] ];
-	}
-	res.code = '2.01';
-	res.json(modLUT);
-	//requestComplete(res, 0);
+	var i = 0;
+	var keys = Object.keys(discoveries_LUT);
+	
+	async.whilst(
+		function(){ return i < keys.length; },
+		function(callback){
+			//cycle through discoveries
+			
+			console.log("~ITERATING THROUGH PERIPHERALS");
+			modLUT[keys[i]] = discoveries[ discoveries_LUT[ keys[i] ] ].info;
+
+			console.log(modLUT[keys[i]]);
+			i++;
+			callback(null,modLUT);
+		},
+		function(err, results){
+			console.log('~ITERATIONS COMPLETE\nRESULTS: ' + JSON.stringify(results));
+			
+			if(err){
+				console.log('WELL KNOWN REQUEST ERROR: ' + err);
+				return null;
+			}else{
+				console.log('~RETURNING RESULTS');
+				res.write(JSON.stringify(results));
+				res.end();
+			}
+		}
+	);
 }
 
 function isNumeric(str){ return !isNaN(str); }
@@ -148,8 +173,10 @@ noble.on('discover', function(peripheral){
 	//if discovery is new
 	if(!discoveries_LUT[id]){
 
-		var peripheralInfo = id + ' (' + peripheral.advertisement.localName + ')';
+		var peripheralInfo = 'Device id: ' + id + ' Local Name: ' + peripheral.advertisement.localName;
 		
+		console.log('Peripheral Info: ' + peripheralInfo);
+
 		var this_index = discoveries.length;
 		discoveries_LUT[id] = this_index;
 
@@ -159,17 +186,21 @@ noble.on('discover', function(peripheral){
 			"inRange": true,
 			"lastSeen": Date.now()
 		});
+
 		discoveries[discoveries.length-1].paths = getServices(this_index);
 		console.log('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date());
-
-		//getCharacteristics( reverse_services_lut[discoveries[this_index].paths[0]] );
 
 	}
 
 	discoveries[ discoveries_LUT[id] ].lastSeen = Date.now();
+	if(!discoveries[ discoveries_LUT[id] ].inRange){
+		console.log('> Peripheral back in range');
+		discoveries[ discoveries_LUT[id] ].inRange = true;
+	}
 });
 
-function getServices(index){
+//response optional parameter
+function getServices(index, res = null){
 	var requestedPeripheral = discoveries[index].peripheral;
 
 	var url_paths = [];
@@ -181,6 +212,11 @@ function getServices(index){
 	});
 
 	requestedPeripheral.connect(function(err){
+
+		if(err){
+			console.log('~CONNECT ERROR: ' + err);
+		}
+
 		requestedPeripheral.discoverServices([], function(error, services){
 			var i = 0, paths = 0;
 
@@ -190,7 +226,7 @@ function getServices(index){
 					var service = services[i];
 
 			        if (services_lookup_table[service.uuid]) {
-			        	url_paths[paths] = service.uuid;
+			        	url_paths.push(service.uuid);
 			        	paths++;
 
 			        	console.log('> ' + services_lookup_table[service.uuid]);
@@ -202,7 +238,12 @@ function getServices(index){
 					if(err){
 						requestedPeripheral.disconnect();
 					}else{
-						return results;
+						if(res){
+							res.write(JSON.stringify(results));
+							res.end();
+						}else{
+							return results;
+						}
 					}
 				}
 			);
@@ -252,6 +293,7 @@ function getCharacteristics(peripheral, uuid){
 			function(err,results){
 				if(err){
 					console.log(err);
+					return null;
 				}else{
 					return results;
 				}
@@ -261,7 +303,7 @@ function getCharacteristics(peripheral, uuid){
 }
 
 /*
-read give characteristic
+read given characteristic
 */
 function read(response, deviceJSON, service, characteristic){
 	var peripheral = deviceJSON.peripheral;
@@ -324,7 +366,7 @@ function read(response, deviceJSON, service, characteristic){
 							console.log(err);
 						}else{
 							response.json(results);
-							requestComplete(response,0);
+							//requestComplete(response,0);
 						}
 					});
 			}

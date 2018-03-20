@@ -1,38 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Proxy Dashboard</title>
+	<title>Device Interface</title>
 	<link href="https://fonts.googleapis.com/css?family=Open+Sans|Raleway|Roboto+Slab" rel="stylesheet">
 	<link rel="stylesheet" type="text/css" href="/scripts/style.css">
 	<link rel="stylesheet" type="text/css" href="/scripts/dashboard.css">
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-	<script type="text/javascript" src="/scripts/dash-utilities.js"></script>
 	<link rel="icon" href="/assets/favicon.png">
 </head>
 <body>
+
 	<a class="floating-btn" id="github-btn" href="https://github.com/lfarrel6/BLE-Proxy-FYP"><img src="/assets/GitHub-Mark-64px.png" alt="View on GitHub!"></a>
 
 	<div class="dash-heading">
-		<h1 id='dash-title'>CoAP Proxy Dashboard</h1>
+		<h1 id='dash-title'></h1>
 	</div>
 
 	<div class="dash-data-window">
 		<img src="/assets/loading.gif" alt="loading" id="loading-gif">
-		<ul id="observations">
+		<ul id="services">
 		</ul>
 	</div>
 
 	<script type="text/javascript">
 		$(document).ready(function(){
+
 			console.log('Document loaded, fetching data');
-			var ip = location.href.split('/');
-			ip = ip[ip.length-1];
+			var splitURL = location.href.split('/');
+			var deviceID = splitURL[splitURL.length-1]
+
+			document.getElementById('dash-title').innerHTML = deviceID;
+
+			var ip = splitURL[splitURL.length-2];
 			console.log(ip);
-			// GET request to /observations triggers a well known request to the CoAP proxy
-
-
-
-			$.get(location.href+'/observations', null, function(data){
+			// GET request to /exp makes the CoAP proxy interrogate the device
+			$.get(location.href+'/exp', null, function(data){
 				document.getElementById('loading-gif').style.padding = 0;
 				document.getElementById('loading-gif').style.visibility = 'hidden';
 
@@ -46,24 +48,20 @@
 
 					var listItem = document.createElement('li');
 					listItem.setAttribute('id',datum);
-					listItem.className = "peripheral-li";
-					document.getElementById('observations').appendChild(listItem);
+					listItem.className = "services-li";
+					document.getElementById('services').appendChild(listItem);
 
-					var button = document.createElement('button');
-					button.className = "dashboard-buttons";
-					button.innerHTML = data[datum];
-
-					listItem.appendChild(button);
+					listItem.innerHTML = data[datum];
 
 					if(listItem.addEventListener){
 						listItem.addEventListener('click', function(){
-							peripheralSelected(datum);
+							serviceRequest(datum);
 						}, false);
 					}else{
 						//legacy support (IE < 9)
 						if(listItem.attachEvent){
 							listItem.attachEvent('click', function(){
-								peripheralSelected(datum);
+								serviceRequest(datum);
 							});
 						}
 					}

@@ -10,7 +10,7 @@ app.use(cookieParser());
 app.use(function(req,res,next){
 	//console.log('cookies:' + req.cookies);
 
-	console.log('Cookies: ', req.cookies);
+	//console.log('Cookies: ', req.cookies);
 
 	var randomNumber = Math.random().toString();
 	if(!req.cookies.token){
