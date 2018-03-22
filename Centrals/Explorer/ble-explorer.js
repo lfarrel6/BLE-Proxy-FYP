@@ -17,9 +17,8 @@ server.on('request', function(req, res){
 	switch(req.method){
 		case 'GET':
 			console.log(chalk.cyan('GET REQUEST RECEIVED'));
-			res.write( get(req.url, res) );
-			console.log(chalk.cyan('OUTGOING RES PAYLOAD: ' + res.payload));
-			res.end();
+			get(req.url, res);
+			//console.log(chalk.cyan('OUTGOING RES PAYLOAD: ' + res.payload));
 			break;
 		//case    'PUT':
 		//case   'POST':
@@ -34,12 +33,17 @@ server.on('request', function(req, res){
 function get(url, response){
 	var splitUrl = url.split('/');
 
+	if(splitUrl.length == 2){
+		console.log(chalk.blue('ALIVE'));
+		response.write('roger');
+		response.end();
+	}
+
 	//coap standard uri for important information on server
 	if(splitUrl.length > 2 && splitUrl[1] === '.well-known' && splitUrl[2] === "core"){
 
 		console.log(chalk.cyan('WELL KNOWN REQUEST'));
-		var information = wellKnown(response);
-		console.log(chalk.cyan('WELL KNOWN OUTPUT: ' + JSON.stringify(information)));
+		wellKnown(response);
 
 	} else{
 		//process get requests for other devices

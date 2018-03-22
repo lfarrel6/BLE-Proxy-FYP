@@ -170,8 +170,12 @@ function ipSubmit(){
 	console.log(enteredIp + ' submitted');
 
 	if(ipv4.test(enteredIp) || ipv6.test(enteredIp) || enteredIp == 'localhost'){
-		document.getElementById('ip-err-msg').style.visibility = 'visible';
-		location.href = location.href + 'dashboard/' + enteredIp;
+		document.getElementById('ip-err-msg').style.visibility = 'invisible';
+		//intiate coap request to see if proxy exists at this ip
+		$.get(enteredIp + '/alive',null,function(data){
+			//if proxy exists, continue to dashboard
+			location.href = location.href + 'dashboard/' + enteredIp;
+		});
 	}else{
 		console.log('Invalid Entry. IPv4 or IPv6 expected.');
 		document.getElementById('ip-err-msg').style.visibility = 'visible';
