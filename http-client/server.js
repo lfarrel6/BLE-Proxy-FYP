@@ -1,6 +1,6 @@
-var path = require('path')
-var express = require('express')
-var app = express()
+var path = require('path');
+var express = require('express');
+var app = express();
 var cookieParser = require('cookie-parser');
 
 var dashboard = require('./dashboard.js')

@@ -101,7 +101,8 @@ function wellKnown(res){
 			//cycle through discoveries
 			
 			console.log(chalk.cyan('ITERATING THROUGH PERIPHERALS'));
-			modLUT[keys[i]] = discoveries[ discoveries_LUT[ keys[i] ] ].info;
+			var thisDiscovery = discoveries[ discoveries_LUT[ keys[i] ] ];
+			modLUT[keys[i]] = {'info': thisDiscovery.info, 'available': thisDiscovery.inRange};
 
 			i++;
 			callback(null,modLUT);
@@ -377,8 +378,8 @@ setInterval(function(){
 	for(var id in discoveries){
 		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout) && discoveries[id]["inRange"]){
 			console.log(chalk.green('> Lost peripheral ' + discoveries[id].info));
-
 			discoveries[id]["inRange"] = false;
+			console.log(chalk.cyan(discoveries[id]["inRange"]));
 		}
 	}
 }, proximity_timeout/2); //check list every 1000ms to see if devices have been lost

@@ -25,13 +25,20 @@
 	<script type="text/javascript">
 		$(document).ready(function(){
 			console.log('Document loaded, fetching data');
-			var ip = location.href.split('/');
-			ip = ip[ip.length-1];
-			console.log(ip);
+			
 			// GET request to /observations triggers a well known request to the CoAP proxy
 
+			retrieveData();
 
+			var minute = 60000;
 
+			setInterval(function(){
+				console.log('Update data');
+				retrieveData();
+			},minute);
+		});
+
+		function retrieveData(){
 			$.get(location.href+'/observations', null, function(data){
 				document.getElementById('loading-gif').style.padding = 0;
 				document.getElementById('loading-gif').style.visibility = 'hidden';
@@ -39,37 +46,53 @@
 				console.log("DATA RECEIVED @ dash: " + data);
 				for(var datum in data){
 
-					console.log(datum);
+					if(document.getElementById(datum)){
 
-					//data is a json
-					//{id: {info json}}
 
-					var listItem = document.createElement('li');
-					listItem.setAttribute('id',datum);
-					listItem.className = "peripheral-li";
-					document.getElementById('observations').appendChild(listItem);
 
-					var button = document.createElement('button');
-					button.className = "dashboard-buttons";
-					button.innerHTML = data[datum];
-
-					listItem.appendChild(button);
-
-					if(listItem.addEventListener){
-						listItem.addEventListener('click', function(){
-							peripheralSelected(datum);
-						}, false);
 					}else{
-						//legacy support (IE < 9)
-						if(listItem.attachEvent){
-							listItem.attachEvent('click', function(){
+
+						console.log(datum);
+
+						//data is a json
+						//{id: {info: <information_string>, available: <available_boolean>}}
+
+						var listItem = document.createElement('li');
+						listItem.setAttribute('id',datum);
+						listItem.className = "peripheral-li";
+						document.getElementById('observations').appendChild(listItem);
+
+						var button = document.createElement('button');
+
+						var buttonClass = "dashboard-buttons" + (data[datum].available?" in-range":" out-of-range");
+						button.setAttribute('id', datum+'-btn');
+
+						button.className = buttonClass;
+						button.innerHTML = data[datum].info;
+
+						listItem.appendChild(button);
+					}
+
+					if(data[datum].available){
+						if(listItem.addEventListener){
+							listItem.addEventListener('click', function(){
 								peripheralSelected(datum);
-							});
+							}, false);
+						}else{
+							//legacy support (IE < 9)
+							if(listItem.attachEvent){
+								listItem.attachEvent('click', function(){
+									peripheralSelected(datum);
+								});
+							}
 						}
+					}else{
+						
 					}
 				}
 			}, 'json');
-		});
+		}
+
 	</script>
 
 </body>

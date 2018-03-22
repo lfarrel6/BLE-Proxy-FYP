@@ -22,7 +22,6 @@
 }
 
 .peripheral-li{
-	cursor: pointer;
 	width: 50%;
 	padding: 0em 0em 1em 0.5em;
 	list-style: none;
@@ -31,14 +30,23 @@
 .dashboard-buttons{
 	font-size: 1em;
 	font-weight: bold;
-	background-color:#0082fc;
 	color:#fff;
 	border: 2px #fff solid;
 	padding: 0.5em;
 	transition: background-color 0.25s, color 0.25s, border 0.25s;
 }
-.dashboard-buttons:hover{
+
+.in-range{
+	background-color:#0082fc;
+}
+.in-range:hover{
 	cursor: pointer;
 	background-color:#fff;
 	color:#0082fc;
+}
+.out-of-range{
+	background-color:#c1c1c1;
+}
+.out-of-range:hover{
+	opacity: 0.2;
 }
