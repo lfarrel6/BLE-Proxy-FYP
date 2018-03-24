@@ -40,48 +40,45 @@
 
 		function retrieveData(){
 			$.get(location.href+'/observations', null, function(data){
+
+				if(typeof data === undefined){
+					console.log('no data on proxy');
+				}
+
 				document.getElementById('loading-gif').style.padding = 0;
 				document.getElementById('loading-gif').style.visibility = 'hidden';
 
 				console.log("DATA RECEIVED @ dash: " + data);
 				for(var datum in data){
 
-					if(document.getElementById(datum)){
+					var datumElem = document.getElementById(datum);
+					var datumBtn = document.getElementById(datum+'-btn');
 
-
-
-					}else{
-
-						console.log(datum);
-
-						//data is a json
-						//{id: {info: <information_string>, available: <available_boolean>}}
+					if(!document.getElementById(datum)){
 
 						var listItem = document.createElement('li');
 						listItem.setAttribute('id',datum);
 						listItem.className = "peripheral-li";
 						document.getElementById('observations').appendChild(listItem);
 
-						var button = document.createElement('button');
+						datumBtn = document.createElement('button');
+						datumBtn.setAttribute('id',datum+'-btn');
+						datumBtn.innerHTML = data[datum].info;
+						listItem.appendChild(datumBtn);
 
-						var buttonClass = "dashboard-buttons" + (data[datum].available?" in-range":" out-of-range");
-						button.setAttribute('id', datum+'-btn');
-
-						button.className = buttonClass;
-						button.innerHTML = data[datum].info;
-
-						listItem.appendChild(button);
 					}
 
+					datumBtn.className = "dashboard-buttons" + (data[datum].available?" in-range":" out-of-range");
+
 					if(data[datum].available){
-						if(listItem.addEventListener){
-							listItem.addEventListener('click', function(){
+						if(datumBtn.addEventListener){
+							datumBtn.addEventListener('click', function(){
 								peripheralSelected(datum);
 							}, false);
 						}else{
 							//legacy support (IE < 9)
-							if(listItem.attachEvent){
-								listItem.attachEvent('click', function(){
+							if(datumBtn.attachEvent){
+								datumBtn.attachEvent('click', function(){
 									peripheralSelected(datum);
 								});
 							}

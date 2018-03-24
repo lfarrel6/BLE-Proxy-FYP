@@ -43,7 +43,6 @@ router.get('/:ip/observations',function(req,res){
 	});
 	coapReq.end();
 	
-	//res.send(responseValue);
 });
 
 router.get('/:ip/:device',function(req,res){

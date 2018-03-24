@@ -102,6 +102,11 @@ $(document).ready(function(){
 		if(user){
 			document.getElementById('auth-container').style.display = 'none';
 			console.log(user.uid + '(' + user.email + ') signed in');
+
+			firebase.database().ref(user.uid).set({
+				lastLogin: Date.now()
+			});
+
 		}else{
 			document.getElementById('auth-container').style.display = 'block';
 		}
@@ -173,8 +178,17 @@ function ipSubmit(){
 		document.getElementById('ip-err-msg').style.visibility = 'invisible';
 		//intiate coap request to see if proxy exists at this ip
 		$.get(enteredIp + '/alive',null,function(data){
-			//if proxy exists, continue to dashboard
-			location.href = location.href + 'dashboard/' + enteredIp;
+			//if proxy exists, add proxy to user in database and continue to dashboard
+			var proxyRef = firebase.database().ref(firebase.auth().currentUser.uid+'/servers/'+enteredIp);
+			proxyRef.once('value',function(snapshot){
+				if(snapshot.exists()){
+					console.log('Proxy already associated to user');
+				}else{
+					proxyRef.set({lastConnection: Date.now()});
+					console.log('Proxy added to user acc');
+				}
+				location.href = location.href + 'dashboard/' + enteredIp;
+			});
 		});
 	}else{
 		console.log('Invalid Entry. IPv4 or IPv6 expected.');

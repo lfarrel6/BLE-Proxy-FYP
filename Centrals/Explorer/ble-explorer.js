@@ -54,8 +54,49 @@ function get(url, response){
 			var deviceId = splitUrl[1];
 
 			if(splitUrl[2] == "exp"){
+				console.log(chalk.cyan('Exploring device:' + deviceId));
 				//explore this device
-				getServices(deviceId, response);
+				var index = discoveries_LUT[deviceId];
+				console.log(index);
+				if(typeof index != 'undefined'){
+				
+					//Rewriting service retrieval into promises
+					var serviceRetrieval = new Promise(function(resolve,reject){
+						var services = getServicesSync(index);
+						if(typeof services != 'undefined'){
+							resolve(services);
+						}else{
+							reject(Error("No Services"));
+						}
+					});
+
+					serviceRetrieval.then(function(result){
+						console.log('Success: ' + result);
+						response.write(result);
+						response.end();
+					}).catch(function(err){
+						//rejected
+						console.log(err);
+						response.write("No services found");
+						response.end();
+					});
+
+					/*var services = getServicesSync(index);
+					if(services != null){
+						console.log(chalk.cyan(services));
+						response.write(services);
+						response.end();
+						console.log(chalk.green('>Services sent!'))
+					}else{
+						response.write('Error: No Services Found');
+						response.end();
+						console.log(chalk.red('No Services found on requested device'));
+					}*/
+				}else{
+					console.log(chalk.red('Error: Unknown peripheral'));
+					response.write('Unknown device id');
+					response.end();
+				}
 			}else{
 				//service interaction
 				var service = splitUrl[2];
@@ -66,7 +107,7 @@ function get(url, response){
 				*/
 
 				var deviceJSON = discoveries[deviceId];
-				if(discoveries[deviceId] && deviceJSON.paths.includes(service)){
+				if(deviceJSON && deviceJSON.paths.includes(service)){
 
 					if(deviceJSON.inRange){
 						var characteristic = splitUrl[3];
@@ -119,7 +160,13 @@ function wellKnown(res){
 				return null;
 			}else{
 				console.log(chalk.cyan('RETURNING RESULTS'));
-				res.write(JSON.stringify(results));
+				if(typeof results !== undefined){
+					res.write(JSON.stringify(results));
+				}else{
+					console.log('no results');
+					res.write('No data exists on this proxy!');
+				}
+				console.log(res.payload);
 				res.end();
 			}
 		}
@@ -205,10 +252,34 @@ noble.on('discover', function(peripheral){
 	}
 });
 
+function getServicesSync(index){
+	console.log('Synchronous service retrieval');
+	var requestedPeripheral = discoveries[index].peripheral;
+	var url_paths=[];
+
+	requestedPeripheral.on('disconnect',function(){
+		noble.startScanning();
+	});
+
+	requestedPeripheral.connect(function(err){
+		if(err){
+			console.log('connect err ' + err);
+		}else{
+			console.log('connected');
+			requestedPeripheral.discoverServices([], function(error,services){
+				for(var i = 0; i < services.length; i++){
+					url_paths.push(service.uuid);
+				}
+				return url_paths;
+			});
+		}
+	});
+}
+
 //response optional parameter
 function getServices(index, res = null){
 	var requestedPeripheral = discoveries[index].peripheral;
-
+	console.log(chalk.cyan('Fetching Services'));
 	var url_paths = [];
 
 	requestedPeripheral.on('disconnect', function(){
@@ -218,29 +289,40 @@ function getServices(index, res = null){
 
 	requestedPeripheral.connect(function(err){
 
+		console.log(chalk.cyan('Connecting to peripheral'));
+
 		if(err){
 			console.log(chalk.red('CONNECT ERROR: ' + err));
 		}
 
 		requestedPeripheral.discoverServices([], function(error, services){
 			var i = 0, paths = 0;
-
+			console.log(chalk.cyan('Service discovery'));
 			async.whilst(
 				function(){ return i < services.length; },
 				function(callback){
 					var service = services[i];
 
-			        if (services_lookup_table[service.uuid]) {
+			        //if (services_lookup_table[service.uuid]) {
 			        	url_paths.push(service.uuid);
 			        	paths++;
 
 			        	console.log(chalk.green('> ' + services_lookup_table[service.uuid]));
-			        }
+			        //}
 			        i++;
 			        callback(null, url_paths);
 				},
 				function(err, results){ 
 					if(err){
+
+						if(res){
+							res.write('No services found');
+							res.end();
+						}else{
+							console.log('no services found');
+							return undefined;
+						}
+
 						console.log(chalk.red('L239, ASYNC ERROR: ' + err));
 						requestedPeripheral.disconnect();
 					}else{
