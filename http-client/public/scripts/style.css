@@ -9,6 +9,11 @@ body{
 	position:fixed;
 }
 
+#github-bg{
+	background-color: #fff;
+	border-radius: 50%;
+}
+
 #github-btn{
 	z-index: 1;
 	padding: 10px;

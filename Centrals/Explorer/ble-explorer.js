@@ -56,46 +56,55 @@ function get(url, response){
 			if(splitUrl[2] == "exp"){
 				console.log(chalk.cyan('Exploring device:' + deviceId));
 				//explore this device
-				var index = discoveries_LUT[deviceId];
-				console.log(index);
-				if(typeof index != 'undefined'){
-				
-					//Rewriting service retrieval into promises
-					var serviceRetrieval = new Promise(function(resolve,reject){
-						var services = getServicesSync(index);
-						if(typeof services != 'undefined'){
-							resolve(services);
-						}else{
-							reject(Error("No Services"));
-						}
-					});
 
-					serviceRetrieval.then(function(result){
-						console.log('Success: ' + result);
-						response.write(result);
-						response.end();
-					}).catch(function(err){
-						//rejected
-						console.log(err);
-						response.write("No services found");
-						response.end();
-					});
-
-					/*var services = getServicesSync(index);
-					if(services != null){
-						console.log(chalk.cyan(services));
-						response.write(services);
-						response.end();
-						console.log(chalk.green('>Services sent!'))
-					}else{
-						response.write('Error: No Services Found');
-						response.end();
-						console.log(chalk.red('No Services found on requested device'));
-					}*/
-				}else{
-					console.log(chalk.red('Error: Unknown peripheral'));
-					response.write('Unknown device id');
+				var device = discoveries[ discoveries_LUT[deviceId] ];
+				if(device.paths.length > 0){
+					console.log(chalk.bgGreen('Paths already exists: ' + device.paths));
+					response.write(device.paths);
 					response.end();
+				}else{
+
+					var index = discoveries_LUT[deviceId];
+					console.log(index);
+					if(typeof index != 'undefined'){
+					
+						//Rewriting service retrieval into promises
+						var serviceRetrieval = new Promise(function(resolve,reject){
+							var services = getServicesSync(index);
+							if(typeof services != 'undefined'){
+								resolve(services);
+							}else{
+								reject(Error("No Services"));
+							}
+						});
+
+						serviceRetrieval.then(function(result){
+							console.log('Success: ' + result);
+							response.write(result);
+							response.end();
+						}).catch(function(err){
+							//rejected
+							console.log(err);
+							response.write("No services found");
+							response.end();
+						});
+
+						/*var services = getServicesSync(index);
+						if(services != null){
+							console.log(chalk.cyan(services));
+							response.write(services);
+							response.end();
+							console.log(chalk.green('>Services sent!'))
+						}else{
+							response.write('Error: No Services Found');
+							response.end();
+							console.log(chalk.red('No Services found on requested device'));
+						}*/
+					}else{
+						console.log(chalk.red('Error: Unknown peripheral'));
+						response.write('Unknown device id');
+						response.end();
+					}
 				}
 			}else{
 				//service interaction
@@ -236,11 +245,13 @@ noble.on('discover', function(peripheral){
 		discoveries.push({
 			"peripheral": peripheral,
 			"info": peripheralInfo,
+			"paths": [],
 			"inRange": true,
 			"lastSeen": Date.now()
 		});
 
-		discoveries[discoveries.length-1].paths = getServices(this_index);
+		getServices(this_index);
+		
 		console.log(chalk.green('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date()));
 
 	}
@@ -259,6 +270,7 @@ function getServicesSync(index){
 
 	requestedPeripheral.on('disconnect',function(){
 		noble.startScanning();
+		//return url_paths;
 	});
 
 	requestedPeripheral.connect(function(err){
@@ -268,9 +280,11 @@ function getServicesSync(index){
 			console.log('connected');
 			requestedPeripheral.discoverServices([], function(error,services){
 				for(var i = 0; i < services.length; i++){
-					url_paths.push(service.uuid);
+					console.log(chalk.bgGreen(services[i].uuid));
+					url_paths.push(services[i].uuid);
 				}
-				return url_paths;
+				discoveries[index].paths = url_paths;
+				requestedPeripheral.disconnect();
 			});
 		}
 	});
@@ -307,30 +321,29 @@ function getServices(index, res = null){
 			        	url_paths.push(service.uuid);
 			        	paths++;
 
-			        	console.log(chalk.green('> ' + services_lookup_table[service.uuid]));
+			        	console.log(chalk.green('> ' + service.uuid));
 			        //}
 			        i++;
 			        callback(null, url_paths);
 				},
 				function(err, results){ 
 					if(err){
-
+						requestedPeripheral.disconnect();
+						discoveries[index].paths = [];
 						if(res){
 							res.write('No services found');
 							res.end();
 						}else{
 							console.log('no services found');
-							return undefined;
 						}
 
 						console.log(chalk.red('L239, ASYNC ERROR: ' + err));
-						requestedPeripheral.disconnect();
 					}else{
+						requestedPeripheral.disconnect();
+						discoveries[index].paths = results;
 						if(res){
 							res.write(JSON.stringify(results));
 							res.end();
-						}else{
-							return results;
 						}
 					}
 				}
@@ -459,7 +472,7 @@ function read(response, deviceJSON, service, characteristic){
 		});
 	});
 }
-
+/*
 setInterval(function(){
 	for(var id in discoveries){
 		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout) && discoveries[id]["inRange"]){
@@ -469,3 +482,4 @@ setInterval(function(){
 		}
 	}
 }, proximity_timeout/2); //check list every 1000ms to see if devices have been lost
+*/
