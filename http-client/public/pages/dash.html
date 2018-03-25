@@ -50,7 +50,7 @@
 
 				console.log("DATA RECEIVED @ dash: " + data);
 				for(var datum in data){
-
+					console.log(datum);
 					var datumElem = document.getElementById(datum);
 					var datumBtn = document.getElementById(datum+'-btn');
 
@@ -70,22 +70,24 @@
 
 					datumBtn.className = "dashboard-buttons" + (data[datum].available?" in-range":" out-of-range");
 
-					if(data[datum].available){
-						if(datumBtn.addEventListener){
-							datumBtn.addEventListener('click', function(){
-								peripheralSelected(datum);
-							}, false);
-						}else{
-							//legacy support (IE < 9)
-							if(datumBtn.attachEvent){
-								datumBtn.attachEvent('click', function(){
-									peripheralSelected(datum);
-								});
-							}
-						}
+					$('#'+datumBtn.id).click(function(){ peripheralSelected($(this).parent().prop('id')); }); //peripheralSelected(datum); });
+
+					/*console.log('Event listeners for: ' + datum);
+					if(datumBtn.addEventListener){
+						console.log(datumBtn.id);
+						datumBtn.addEventListener('click', function(){
+							console.log(datum);
+							peripheralSelected(datum);
+						}, false);
 					}else{
-						
-					}
+						//legacy support (IE < 9)
+						if(datumBtn.attachEvent){
+							datumBtn.attachEvent('click', function(){
+								console.log(datum);
+								peripheralSelected(datum);
+							});
+						}
+					}*/
 				}
 			}, 'json');
 		}

@@ -58,9 +58,9 @@ function get(url, response){
 				//explore this device
 
 				var device = discoveries[ discoveries_LUT[deviceId] ];
-				if(device.paths.length > 0){
-					console.log(chalk.bgGreen('Paths already exists: ' + device.paths));
-					response.write(device.paths);
+				if(device.paths){
+					console.log(chalk.bgGreen('Paths already exists: ' + JSON.stringify(device.paths)));
+					response.write(JSON.stringify(device.paths));
 					response.end();
 				}else{
 
@@ -70,21 +70,21 @@ function get(url, response){
 					
 						//Rewriting service retrieval into promises
 						var serviceRetrieval = new Promise(function(resolve,reject){
-							var services = getServicesSync(index);
-							if(typeof services != 'undefined'){
-								resolve(services);
+							getServicesSync(index);
+							if(device.paths){
+								resolve(device.paths);
 							}else{
 								reject(Error("No Services"));
 							}
 						});
 
 						serviceRetrieval.then(function(result){
-							console.log('Success: ' + result);
-							response.write(result);
+							console.log('Success: ' + JSON.stringify(result));
+							response.write(JSON.stringify(result));
 							response.end();
 						}).catch(function(err){
 							//rejected
-							console.log(err);
+							//console.log(err);
 							response.write("No services found");
 							response.end();
 						});
@@ -245,12 +245,11 @@ noble.on('discover', function(peripheral){
 		discoveries.push({
 			"peripheral": peripheral,
 			"info": peripheralInfo,
-			"paths": [],
 			"inRange": true,
 			"lastSeen": Date.now()
 		});
 
-		getServices(this_index);
+		getServicesSync(this_index);
 		
 		console.log(chalk.green('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date()));
 
@@ -266,7 +265,7 @@ noble.on('discover', function(peripheral){
 function getServicesSync(index){
 	console.log('Synchronous service retrieval');
 	var requestedPeripheral = discoveries[index].peripheral;
-	var url_paths=[];
+	var url_paths={};
 
 	requestedPeripheral.on('disconnect',function(){
 		noble.startScanning();
@@ -281,7 +280,7 @@ function getServicesSync(index){
 			requestedPeripheral.discoverServices([], function(error,services){
 				for(var i = 0; i < services.length; i++){
 					console.log(chalk.bgGreen(services[i].uuid));
-					url_paths.push(services[i].uuid);
+					url_paths[services[i].uuid] = reverse_services_lut[services[i].uuid];
 				}
 				discoveries[index].paths = url_paths;
 				requestedPeripheral.disconnect();
@@ -294,7 +293,7 @@ function getServicesSync(index){
 function getServices(index, res = null){
 	var requestedPeripheral = discoveries[index].peripheral;
 	console.log(chalk.cyan('Fetching Services'));
-	var url_paths = [];
+	var url_paths = {};
 
 	requestedPeripheral.on('disconnect', function(){
 		console.log(chalk.green('> Requested Peripheral disconnect @ ' + new Date()));
@@ -318,7 +317,7 @@ function getServices(index, res = null){
 					var service = services[i];
 
 			        //if (services_lookup_table[service.uuid]) {
-			        	url_paths.push(service.uuid);
+			        	url_paths[service.uuid] = reverse_services_lut[service.uuid];
 			        	paths++;
 
 			        	console.log(chalk.green('> ' + service.uuid));
