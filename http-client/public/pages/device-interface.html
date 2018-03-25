@@ -51,7 +51,8 @@
 					listItem.className = "services-li";
 					document.getElementById('services').appendChild(listItem);
 
-					listItem.innerHTML = data[datum];
+					//listItem.innerHTML = data[datum];
+					listItem.innerHTML = datum;
 
 					if(listItem.addEventListener){
 						listItem.addEventListener('click', function(){

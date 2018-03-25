@@ -280,7 +280,7 @@ function getServicesSync(index){
 			requestedPeripheral.discoverServices([], function(error,services){
 				for(var i = 0; i < services.length; i++){
 					console.log(chalk.bgGreen(services[i].uuid));
-					url_paths[services[i].uuid] = reverse_services_lut[services[i].uuid];
+					url_paths[services[i].uuid] = "service";
 				}
 				discoveries[index].paths = url_paths;
 				requestedPeripheral.disconnect();
