@@ -38,33 +38,42 @@
 				document.getElementById('loading-gif').style.padding = 0;
 				document.getElementById('loading-gif').style.visibility = 'hidden';
 
-				console.log("DATA RECEIVED @ dash: " + data);
-				for(var datum in data){
+				console.log("DATA RECEIVED @ dash: " + JSON.stringify(data));
+				var services = Object.keys(data).length;
 
-					console.log(datum);
-
-					//data is a json
-					//{id: {info json}}
-
+				if(services == 0){
 					var listItem = document.createElement('li');
-					listItem.setAttribute('id',datum);
-					listItem.className = "services-li";
+					listItem.className = 'bad-news';
 					document.getElementById('services').appendChild(listItem);
 
-					//listItem.innerHTML = data[datum];
-					listItem.innerHTML = datum;
+					listItem.innerHTML = 'PROXY SERVER RETURNED NO SERVICES';
+				}else{
 
-					if(listItem.addEventListener){
-						listItem.addEventListener('click', function(){
-							serviceRequest(datum);
-						}, false);
-					}else{
-						//legacy support (IE < 9)
-						if(listItem.attachEvent){
-							listItem.attachEvent('click', function(){
-								serviceRequest(datum);
+					for(var datum in data){
+
+						console.log(datum);
+
+						//data is a json
+						//{id: {info json}}
+
+						var listItem = document.createElement('li');
+						listItem.className = "peripheral-li";
+						document.getElementById('services').appendChild(listItem);
+
+						var button = document.createElement('button');
+						button.setAttribute('id',datum);
+						button.className = "dashboard-buttons in-range";
+						button.innerHTML = datum;
+
+						//listItem.innerHTML = data[datum];
+						listItem.appendChild(button);
+
+
+						$('#'+datum).click(function(){
+							$.get(location.href+'/'+$(this).prop('id')+'/getChars',null,function(data){
+								console.log('RESPONSE: '+JSON.stringify(data));
 							});
-						}
+						});
 					}
 				}
 			}, 'json');

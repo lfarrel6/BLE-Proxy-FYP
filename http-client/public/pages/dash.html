@@ -70,24 +70,8 @@
 
 					datumBtn.className = "dashboard-buttons" + (data[datum].available?" in-range":" out-of-range");
 
-					$('#'+datumBtn.id).click(function(){ peripheralSelected($(this).parent().prop('id')); }); //peripheralSelected(datum); });
+					$('#'+datumBtn.id).click(function(){ peripheralSelected($(this).parent().prop('id')); });
 
-					/*console.log('Event listeners for: ' + datum);
-					if(datumBtn.addEventListener){
-						console.log(datumBtn.id);
-						datumBtn.addEventListener('click', function(){
-							console.log(datum);
-							peripheralSelected(datum);
-						}, false);
-					}else{
-						//legacy support (IE < 9)
-						if(datumBtn.attachEvent){
-							datumBtn.attachEvent('click', function(){
-								console.log(datum);
-								peripheralSelected(datum);
-							});
-						}
-					}*/
 				}
 			}, 'json');
 		}

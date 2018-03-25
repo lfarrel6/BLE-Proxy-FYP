@@ -50,3 +50,14 @@
 .out-of-range:hover{
 	opacity: 0.2;
 }
+
+.bad-news{
+	list-style: none;
+	text-align: center;
+	font-weight: bold;
+	font-size: 2em;
+}
+
+.service-li{
+	list-style: none;
+}

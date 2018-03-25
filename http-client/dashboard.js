@@ -75,4 +75,28 @@ router.get('/:ip/:device/exp',function(req,res){
 	coapReq.end();
 });
 
+router.get('/:ip/:device/:service/getChars',function(req,res){
+	if(!ipAddr){ 
+		ipAddr = req.params.ip;
+	}
+	var deviceID = req.params.device;
+	var service = req.params.service;
+	console.log('Getting characteristics for ' + service);
+
+	var coapReq = coap.request('coap://' + ipAddr + ':5683/'+deviceID+'/'+service+'/getChars');
+
+	coapReq.on('response', function(coapRes){
+		coapRes.setEncoding('utf8');
+
+		coapRes.on('data', function(chunk){
+			res.write(chunk);
+		});
+
+		coapRes.on('end', function(){
+			res.end();
+		});
+	});
+	coapReq.end();
+});
+
 module.exports = router;

@@ -58,7 +58,7 @@ function get(url, response){
 				//explore this device
 
 				var device = discoveries[ discoveries_LUT[deviceId] ];
-				if(device.paths){
+				if(device.paths && Object.keys(device.paths)>0){
 					console.log(chalk.bgGreen('Paths already exists: ' + JSON.stringify(device.paths)));
 					response.write(JSON.stringify(device.paths));
 					response.end();
@@ -115,14 +115,43 @@ function get(url, response){
 				- requires service validation
 				*/
 
-				var deviceJSON = discoveries[deviceId];
-				if(deviceJSON && deviceJSON.paths.includes(service)){
+				var deviceJSON = discoveries[ discoveries_LUT[deviceId] ];
+				console.log(chalk.inverse('paths[service] = ' + JSON.stringify(deviceJSON.paths[service])));
+				if(deviceJSON && deviceJSON.paths[service]){
 
 					if(deviceJSON.inRange){
-						var characteristic = splitUrl[3];
-						//get request to a characteristic is a read
+						console.log(chalk.inverse('Device in range'));
+						var argFour = splitUrl[3];
+						if(argFour == 'getChars'){
+
+							/*var characteristicsPromise = new Promise(function(resolve,reject){
+								var characteristics = getCharacteristics(deviceJSON.peripheral, service);
+								if(typeof characteristics !== 'undefined'){
+									resolve(characteristics);
+								}else{
+									reject(new Error('Charcateristics retrieval error'));
+								}
+							});
+
+							characteristicsPromise.then(function(result){
+								response.write(JSON.stringify(result));
+								response.end();
+							}).catch(function(err){
+								console.log(err);
+								response.write('An error occured when retrieving the characteristics');
+								response.end();
+							});*/
+
+							getCharacteristics(deviceJSON.peripheral, service, function(x){ 
+								response.write(x);
+								response.end();
+							});
+
+						}else{
+							//get request to a characteristic is a read
 					
-						read(response,deviceJSON,service,characteristic);
+							read(response,deviceJSON,service,characteristic);
+						}
 					}else{
 						response.write("Device has gone out of range");
 						requestComplete(response,2);
@@ -213,7 +242,7 @@ noble.on('stateChange', function(state){
 	console.log(chalk.green('> State Change Event... ' + state));
 	if(state === 'poweredOn'){
 		//Search for any uuid, don't accept duplicates
-		noble.startScanning([], false);
+		noble.startScanning([], true);
 	} else{ 
 		noble.stopScanning();
 	}
@@ -263,11 +292,13 @@ noble.on('discover', function(peripheral){
 });
 
 function getServicesSync(index){
+	noble.stopScanning();
 	console.log('Synchronous service retrieval');
 	var requestedPeripheral = discoveries[index].peripheral;
 	var url_paths={};
 
 	requestedPeripheral.on('disconnect',function(){
+		console.log('Disconnected in services sync');
 		noble.startScanning();
 		//return url_paths;
 	});
@@ -276,11 +307,12 @@ function getServicesSync(index){
 		if(err){
 			console.log('connect err ' + err);
 		}else{
-			console.log('connected');
+			console.log('connected to ' + discoveries[index].info);
 			requestedPeripheral.discoverServices([], function(error,services){
 				for(var i = 0; i < services.length; i++){
 					console.log(chalk.bgGreen(services[i].uuid));
-					url_paths[services[i].uuid] = "service";
+
+					url_paths[services[i].uuid] = {};
 				}
 				discoveries[index].paths = url_paths;
 				requestedPeripheral.disconnect();
@@ -291,6 +323,7 @@ function getServicesSync(index){
 
 //response optional parameter
 function getServices(index, res = null){
+	noble.stopScanning();
 	var requestedPeripheral = discoveries[index].peripheral;
 	console.log(chalk.cyan('Fetching Services'));
 	var url_paths = {};
@@ -317,7 +350,7 @@ function getServices(index, res = null){
 					var service = services[i];
 
 			        //if (services_lookup_table[service.uuid]) {
-			        	url_paths[service.uuid] = reverse_services_lut[service.uuid];
+			        	url_paths[service.uuid] = getCharacteristics(requestedPeripheral,service.uuid);
 			        	paths++;
 
 			        	console.log(chalk.green('> ' + service.uuid));
@@ -351,11 +384,65 @@ function getServices(index, res = null){
 	});
 }
 
+function getCharacteristics(peripheral, uuid, callback = null){
+	noble.stopScanning();
+	console.log(chalk.bgCyan('Getting ' + uuid + ' from ' + peripheral.advertisement.localName));
+
+	peripheral.on('disconnect',function(){
+		console.log('Disconnected in getCharacteristics');
+		noble.startScanning();
+	});
+
+
+	peripheral.connect(function(connectErr){
+		console.log(chalk.bgCyan('Connection formed'));
+		if(connectErr){
+			console.log(chalk.red('ERROR GETTING CHARACTERISTICS: ' + connectErr));
+			callback(connectErr);
+		}else{
+			console.log(chalk.bgCyan('No error before discoverServices'));
+			peripheral.discoverServices([uuid], function(servicesErr,services){
+
+				if(servicesErr){
+					console.log(chalk.red('ERROR DISCOVERING SERVICE (' + uuid + '): ' + servicesErr));
+					callback(servicesErr);
+				}else{
+					console.log('services length @ 393: '+services.length);
+					for(var i = 0; i < services.length; i++){
+						var service = services[i];
+						service.discoverCharacteristics([], function(characteristicsErr, characteristics){
+							if(characteristicsErr){
+								console.log(chalk.red('ERROR DISCOVERING CHARACTERISTICS: ' + characteristicsErr));
+								callback(characteristicsErr);
+							}else{
+								console.log(characteristics);
+								var result = {};
+								for(var j = 0; j < characteristics.length; j++){
+
+									console.log(chalk.bgCyan(j + ': being added to result'));
+									var thisChar = characteristics[j];
+									result[thisChar.uuid] = thisChar.name;
+
+								}
+								peripheral.disconnect();
+								callback(JSON.stringify(result));
+							}
+						})
+					}
+				}
+
+			});
+
+		}
+	});
+	
+}
+
 /*
 peripheral: noble peripheral object with which connection is being sought
 uuid: desired services uuid
 */
-function getCharacteristics(peripheral, uuid){
+function exploreService(peripheral, uuid){
 	var info = [];
 	peripheral.discoverServices([uuid], function(error, services){
 		
