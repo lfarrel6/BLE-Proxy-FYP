@@ -12,10 +12,19 @@ router.get('/:ip', function(req,res){
 router.get('/:ip/observations',function(req,res){
 	ipAddr = req.params.ip;
 
-	console.log('SENDING COAP REQUEST');
+	console.log(req.query);
 
-	var coapReq = coap.request('coap://'+ipAddr+':5683/.well-known/core');
+	console.log('SENDING COAP REQUEST, ' + req.url);
+
+	var requestUrl = 'coap://'+ipAddr+':5683/.well-known/core';
 	
+	if(req.query.ind){
+		console.log(req.query.ind);
+		requestUrl=requestUrl+'/'+req.query.ind;
+	}
+	console.log(requestUrl);
+	var coapReq = coap.request(requestUrl);
+
 	var responseValue;
 
 	coapReq.on('response',function(coapRes){
@@ -27,18 +36,23 @@ router.get('/:ip/observations',function(req,res){
 		coapRes.setEncoding('utf8');
 
 		console.log("PAYLOAD: " + coapRes.payload);
-
-		coapRes.on('data',function(chunk){
-
-			console.log('CHUNK TYPE: ' + chunk.constructor.name);
-
-			res.write(chunk);
-		});
-		
-		coapRes.on('end', function(){
-			console.log('COAP RESPONSE COMPLETE');
+		if(coapRes.payload == "N/A"){
+			res.write("N/A");
 			res.end();
-		});
+		}else{
+
+			coapRes.on('data',function(chunk){
+
+				console.log('CHUNK TYPE: ' + chunk.constructor.name);
+
+				res.write(chunk);
+			});
+		
+			coapRes.on('end', function(){
+				console.log('COAP RESPONSE COMPLETE');
+				res.end();
+			});
+		}
 
 	});
 	coapReq.end();

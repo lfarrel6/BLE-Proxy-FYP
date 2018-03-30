@@ -2,6 +2,7 @@ var noble                      = require('noble')
   , coap                       = require('coap')
   , async                      = require('async')
   , chalk                      = require('chalk')
+  , sizeof                     = require('object-sizeof')
   , server                     = coap.createServer()
   , discoveries                = []
   , discoveries_LUT            = {}   //To allow for more simple indexing of peripherals using a lut to relate id's to indexes 
@@ -43,7 +44,12 @@ function get(url, response){
 	if(splitUrl.length > 2 && splitUrl[1] === '.well-known' && splitUrl[2] === "core"){
 
 		console.log(chalk.cyan('WELL KNOWN REQUEST'));
-		wellKnown(response);
+		console.log(splitUrl);
+		if(splitUrl.length==4){
+			wellKnown(response,splitUrl[3]);
+		}else{
+			wellKnown(response);
+		}
 
 	} else{
 		//process get requests for other devices
@@ -57,54 +63,14 @@ function get(url, response){
 				console.log(chalk.cyan('Exploring device:' + deviceId));
 				//explore this device
 
-				var device = discoveries[ discoveries_LUT[deviceId] ];
-				if(device.paths && Object.keys(device.paths)>0){
-					console.log(chalk.bgGreen('Paths already exists: ' + JSON.stringify(device.paths)));
-					response.write(JSON.stringify(device.paths));
-					response.end();
+				console.log(discoveries_LUT[deviceId]);
+				if(discoveries_LUT[deviceId]){
+
+					getServicesSync(discoveries_LUT[deviceId],response);
 				}else{
-
-					var index = discoveries_LUT[deviceId];
-					console.log(index);
-					if(typeof index != 'undefined'){
-					
-						//Rewriting service retrieval into promises
-						var serviceRetrieval = new Promise(function(resolve,reject){
-							getServicesSync(index);
-							if(device.paths){
-								resolve(device.paths);
-							}else{
-								reject(Error("No Services"));
-							}
-						});
-
-						serviceRetrieval.then(function(result){
-							console.log('Success: ' + JSON.stringify(result));
-							response.write(JSON.stringify(result));
-							response.end();
-						}).catch(function(err){
-							//rejected
-							//console.log(err);
-							response.write("No services found");
-							response.end();
-						});
-
-						/*var services = getServicesSync(index);
-						if(services != null){
-							console.log(chalk.cyan(services));
-							response.write(services);
-							response.end();
-							console.log(chalk.green('>Services sent!'))
-						}else{
-							response.write('Error: No Services Found');
-							response.end();
-							console.log(chalk.red('No Services found on requested device'));
-						}*/
-					}else{
-						console.log(chalk.red('Error: Unknown peripheral'));
-						response.write('Unknown device id');
-						response.end();
-					}
+					console.log(chalk.red('Error: Unknown peripheral'));
+					response.write('Unknown device id');
+					response.end();
 				}
 			}else{
 				//service interaction
@@ -124,27 +90,9 @@ function get(url, response){
 						var argFour = splitUrl[3];
 						if(argFour == 'getChars'){
 
-							/*var characteristicsPromise = new Promise(function(resolve,reject){
-								var characteristics = getCharacteristics(deviceJSON.peripheral, service);
-								if(typeof characteristics !== 'undefined'){
-									resolve(characteristics);
-								}else{
-									reject(new Error('Charcateristics retrieval error'));
-								}
-							});
-
-							characteristicsPromise.then(function(result){
-								response.write(JSON.stringify(result));
-								response.end();
-							}).catch(function(err){
-								console.log(err);
-								response.write('An error occured when retrieving the characteristics');
-								response.end();
-							});*/
-
 							getCharacteristics(deviceJSON.peripheral, service, function(x){ 
-								response.write(x);
-								response.end();
+									response.write(x);
+									response.end();
 							});
 
 						}else{
@@ -170,45 +118,52 @@ function get(url, response){
 	}
 }
 
-function wellKnown(res){
+function wellKnown(res,index=null){
 
 	console.log(chalk.cyan('WELL KNOWN PROCESSING'));
 	var modLUT = {};
 
 	var i = 0;
+	if(index){
+		i = index;
+	}
+	var responseLength = 0;
 	var keys = Object.keys(discoveries_LUT);
 	
-	async.whilst(
-		function(){ return i < keys.length; },
-		function(callback){
-			//cycle through discoveries
-			
-			console.log(chalk.cyan('ITERATING THROUGH PERIPHERALS'));
-			var thisDiscovery = discoveries[ discoveries_LUT[ keys[i] ] ];
-			modLUT[keys[i]] = {'info': thisDiscovery.info, 'available': thisDiscovery.inRange};
+	var getDiscoveries = new Promise(function(resolve,reject){
+		async.whilst(
+			function(){ return i < keys.length && responseLength < 5; },
+			function(callback){
+				var thisDiscovery = discoveries[ discoveries_LUT[ keys[i] ] ];
+				modLUT[keys[i]] = { 'info': thisDiscovery.info, 'available': thisDiscovery.inRange };
 
-			i++;
-			callback(null,modLUT);
-		},
-		function(err, results){
-			console.log(chalk.cyan('ITERATIONS COMPLETE\nRESULTS: ' + JSON.stringify(results)));
-			
-			if(err){
-				console.log(chalk.red('L112, WELL KNOWN REQUEST ERROR: ' + err));
-				return null;
-			}else{
-				console.log(chalk.cyan('RETURNING RESULTS'));
-				if(typeof results !== undefined){
-					res.write(JSON.stringify(results));
-				}else{
-					console.log('no results');
-					res.write('No data exists on this proxy!');
+				i++; responseLength++;
+				callback(null,modLUT);
+			},
+			function(err,res){
+				if(err){
+					reject(err);
+				}else{ 
+					if(Object.keys(res).length > 0){
+						resolve(JSON.stringify(res));
+					}else{
+						resolve('N/A');
+					}
 				}
-				console.log(res.payload);
-				res.end();
 			}
-		}
-	);
+		);
+		//if function doesn't complete in 15 seconds, force timeout
+		setTimeout(reject('Timeout'),15000);
+	});
+	getDiscoveries.then(function(result){
+		res.write(result);
+		res.end();
+	}).catch(function(err){
+		console.log(chalk.red(err));
+		res.write(err);
+		res.end();
+	});
+
 }
 
 function isNumeric(str){ return !isNaN(str); }
@@ -277,9 +232,24 @@ noble.on('discover', function(peripheral){
 			"inRange": true,
 			"lastSeen": Date.now()
 		});
+		console.log(chalk.magenta(JSON.stringify(peripheral.advertisement.serviceData)+'\n'+JSON.stringify(peripheral.advertisement.serviceUuids)));
+		var services = [];
+		if(peripheral.advertisement.serviceData && peripheral.advertisement.serviceData.length > 0){
+			
+			for(var s in peripheral.advertisement.serviceData){
+				services.push(peripheral.advertisement.serviceData[s].uuid);
+			}
+			console.log(chalk.magenta('Advertisement Services: ' + services));
+		}
+		if(peripheral.advertisement.serviceUuids && peripheral.advertisement.serviceUuids.length > 0){
+			for(var uuid in peripheral.advertisement.serviceUuids){
+				services.push(peripheral.advertisement.serviceUuids[uuid]);
+			}
+		}
+		if(services.length>0){
+			discoveries[this_index].paths = services;
+		}
 
-		getServicesSync(this_index);
-		
 		console.log(chalk.green('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date()));
 
 	}
@@ -291,38 +261,70 @@ noble.on('discover', function(peripheral){
 	}
 });
 
-function getServicesSync(index){
+function getServicesSync(index,response){
 	noble.stopScanning();
-	console.log('Synchronous service retrieval');
 	var requestedPeripheral = discoveries[index].peripheral;
 	var url_paths={};
 
-	requestedPeripheral.on('disconnect',function(){
-		console.log('Disconnected in services sync');
+	var getServices = new Promise(function(resolve,reject){
+		console.log('Synchronous service retrieval');
+
+		requestedPeripheral.on('disconnect',function(){
+			console.log('Disconnected in services sync');
+		});
+
+		requestedPeripheral.connect(function(err){
+			if(err){
+				console.log('connect err ' + err);
+				reject(err);
+			}else{
+				console.log('connected to ' + discoveries[index].info);
+				requestedPeripheral.discoverServices([], function(error,services){
+					if(error){
+						reject(error);
+					}else{
+						for(var i = 0; i < services.length; i++){
+							console.log(chalk.bgGreen(services[i].uuid));
+
+							url_paths[services[i].uuid] = {};
+						}
+						if(Object.keys(discoveries[index].paths).length < Object.keys(url_paths).length){
+							discoveries[index].paths = url_paths;
+							resolve(JSON.stringify(url_paths));
+						}else{
+							resolve(JSON.stringify(discoveries[index].paths));
+						}
+					}
+				});
+			}
+		});
+		
+		//call timeout after 30 seconds
+		setTimeout(function(){
+			reject('Timeout');
+		}, 30000);
+	});
+	
+	getServices.then(function(result){
+
+		requestedPeripheral.disconnect();
+		response.write(result);
+		response.end();
 		noble.startScanning();
-		//return url_paths;
+
+	}).catch(function(err){
+		
+		requestedPeripheral.disconnect();
+		response.write(err);
+		response.end();
+		noble.startScanning();
+
 	});
 
-	requestedPeripheral.connect(function(err){
-		if(err){
-			console.log('connect err ' + err);
-		}else{
-			console.log('connected to ' + discoveries[index].info);
-			requestedPeripheral.discoverServices([], function(error,services){
-				for(var i = 0; i < services.length; i++){
-					console.log(chalk.bgGreen(services[i].uuid));
-
-					url_paths[services[i].uuid] = {};
-				}
-				discoveries[index].paths = url_paths;
-				requestedPeripheral.disconnect();
-			});
-		}
-	});
 }
 
 //response optional parameter
-function getServices(index, res = null){
+function getServices(index, callback){
 	noble.stopScanning();
 	var requestedPeripheral = discoveries[index].peripheral;
 	console.log(chalk.cyan('Fetching Services'));
@@ -346,7 +348,7 @@ function getServices(index, res = null){
 			console.log(chalk.cyan('Service discovery'));
 			async.whilst(
 				function(){ return i < services.length; },
-				function(callback){
+				function(serviceCallback){
 					var service = services[i];
 
 			        //if (services_lookup_table[service.uuid]) {
@@ -356,27 +358,20 @@ function getServices(index, res = null){
 			        	console.log(chalk.green('> ' + service.uuid));
 			        //}
 			        i++;
-			        callback(null, url_paths);
+			        serviceCallback(null, url_paths);
 				},
 				function(err, results){ 
 					if(err){
+						callback(JSON.stringify(err));
+
 						requestedPeripheral.disconnect();
 						discoveries[index].paths = [];
-						if(res){
-							res.write('No services found');
-							res.end();
-						}else{
-							console.log('no services found');
-						}
-
+						
 						console.log(chalk.red('L239, ASYNC ERROR: ' + err));
 					}else{
+						callback(JSON.stringify(results));
 						requestedPeripheral.disconnect();
 						discoveries[index].paths = results;
-						if(res){
-							res.write(JSON.stringify(results));
-							res.end();
-						}
 					}
 				}
 			);
@@ -384,7 +379,7 @@ function getServices(index, res = null){
 	});
 }
 
-function getCharacteristics(peripheral, uuid, callback = null){
+function getCharacteristics(peripheral, uuid, callback){
 	noble.stopScanning();
 	console.log(chalk.bgCyan('Getting ' + uuid + ' from ' + peripheral.advertisement.localName));
 

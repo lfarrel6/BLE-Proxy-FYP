@@ -34,12 +34,17 @@
 
 			setInterval(function(){
 				console.log('Update data');
-				retrieveData();
-			},minute);
+				console.log(document.getElementById('observations').children.length);
+				retrieveData(document.getElementById('observations').children.length);
+			},minute/2);
 		});
 
-		function retrieveData(){
-			$.get(location.href+'/observations', null, function(data){
+		function retrieveData(index = null){
+			var url = location.href+'/observations';
+			if(index){
+				url += '?ind='+index;
+			}
+			$.get(url, null, function(data){
 
 				if(typeof data === undefined){
 					console.log('no data on proxy');
@@ -48,7 +53,7 @@
 				document.getElementById('loading-gif').style.padding = 0;
 				document.getElementById('loading-gif').style.visibility = 'hidden';
 
-				console.log("DATA RECEIVED @ dash: " + data);
+				console.log("DATA RECEIVED @ dash: " + JSON.stringify(data));
 				for(var datum in data){
 					console.log(datum);
 					var datumElem = document.getElementById(datum);
@@ -68,7 +73,7 @@
 
 					}
 
-					datumBtn.className = "dashboard-buttons" + (data[datum].available?" in-range":" out-of-range");
+					datumBtn.className = "dashboard-buttons" + (data[datum].available?" active":" out-of-range");
 
 					$('#'+datumBtn.id).click(function(){ peripheralSelected($(this).parent().prop('id')); });
 
