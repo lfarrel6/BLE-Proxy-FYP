@@ -134,8 +134,13 @@ function get(url, response){
 						console.log(chalk.inverse('Device in range'));
 						var argFour = splitUrl[3];
 						if(argFour == 'getChars'){
-
-							getCharacteristics(deviceJSON.peripheral, service, response);
+							var keys = Object.keys(deviceJSON.paths[service]);
+							if(keys.length > 0){
+								response.write(deviceJSON.paths[service]);
+								response.end();
+							}else{
+								getCharacteristics(deviceId, service, response);
+							}
 
 						}else{
 							//get request to a characteristic is a read
@@ -439,8 +444,11 @@ function getServices(index,response){
 
 }
 
-function getCharacteristics(peripheral, uuid, response){
+function getCharacteristics(index, uuid, response){
 	noble.stopScanning();
+
+	var peripheral = discoveries[index].peripheral;
+
 	console.log(chalk.bgCyan('Getting ' + uuid + ' from ' + peripheral.advertisement.localName));
 
 
@@ -512,6 +520,7 @@ function getCharacteristics(peripheral, uuid, response){
 		console.log('Successfully retrieved characteristics');
 
 		peripheral.disconnect();
+		discoveries[index].paths[uuid] = results;
 		response.write(results);
 		response.end();
 		noble.startScanning();

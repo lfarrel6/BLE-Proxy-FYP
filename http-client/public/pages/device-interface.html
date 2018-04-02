@@ -42,6 +42,11 @@
   		}
 
   		function displayChars(characteristics){
+
+  			var myNode = document.getElementById("characteristics");
+			while (myNode.firstChild) {
+    			myNode.removeChild(myNode.firstChild);
+			}
   			for(var c in characteristics){
 				if(!document.getElementById(c)){
 
@@ -109,28 +114,32 @@
 						$('#'+datum).click(function(){
 							var service = $(this).prop('id');
 							console.log('chars: ' + JSON.stringify(chars));
-							if(chars[service]){
-								displayChars(chars[service]);
-							}else{
-								$.get(location.href+'/'+service+'/getChars',null,function(characteristics){
-									document.getElementById('selected-service').innerHTML = service;
-									console.log('RESPONSE: '+JSON.stringify(characteristics));
-									var charJSON;
-									try{
-										charJSON = JSON.parse(characteristics);
-										chars[service] = charJSON;
-										displayChars(chars[service]);
-									}catch(e){
-										var newLI = document.createElement('li');
-										document.getElementById('characteristics').appendChild(newLI);
-										
-										var charBtn = document.createElement('button');
-										charBtn.className='dashboard-buttons active';
-										charBtn.innerHTML = characteristics;
 
-										newLI.appendChild(charBtn);
-									}
-								});
+							if(service != document.getElementById('selected-service').innerHTML){
+
+								if(chars[service]){
+									displayChars(chars[service]);
+								}else{
+									$.get(location.href+'/'+service+'/getChars',null,function(characteristics){
+										document.getElementById('selected-service').innerHTML = service;
+										console.log('RESPONSE: '+JSON.stringify(characteristics));
+										var charJSON;
+										try{
+											charJSON = JSON.parse(characteristics);
+											chars[service] = charJSON;
+											displayChars(chars[service]);
+										}catch(e){
+											var newLI = document.createElement('li');
+											document.getElementById('characteristics').appendChild(newLI);
+											
+											var charBtn = document.createElement('button');
+											charBtn.className='dashboard-buttons active';
+											charBtn.innerHTML = characteristics;
+
+											newLI.appendChild(charBtn);
+										}
+									});
+								}
 							}
 						});
 					}
