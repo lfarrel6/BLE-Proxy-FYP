@@ -105,10 +105,13 @@ function get(url, response){
 				console.log(chalk.cyan('Exploring device:' + deviceId));
 				//explore this device
 
-				console.log(discoveries_LUT[deviceId]);
-				if(discoveries_LUT[deviceId]){
-
-					getServicesSync(discoveries_LUT[deviceId],response);
+				if(discoveries[deviceId]){
+					if(discoveries[deviceId].explored){
+						response.write(JSON.stringify(discoveries[deviceId].paths));
+						response.end();
+					}else{
+						getServicesSync(deviceId,response);
+					}
 				}else{
 					console.log(chalk.red('Error: Unknown peripheral'));
 					response.write('Unknown device id');
@@ -123,7 +126,7 @@ function get(url, response){
 				- requires service validation
 				*/
 
-				var deviceJSON = discoveries[ discoveries_LUT[deviceId] ];
+				var deviceJSON = discoveries[ deviceId ];
 				console.log(chalk.inverse('paths[service] = ' + JSON.stringify(deviceJSON.paths[service])));
 				if(deviceJSON && deviceJSON.paths[service]){
 
@@ -174,7 +177,7 @@ function wellKnown(res,index=null){
 			function(){ return i < keys.length && responseLength < 5; },
 			function(callback){
 				var thisDiscovery = discoveries[ discoveries_LUT[ keys[i] ] ];
-				modLUT[keys[i]] = { 'info': thisDiscovery.info, 'available': thisDiscovery.inRange };
+				modLUT[ discoveries_LUT[keys[i]] ] = { 'info': thisDiscovery.info, 'available': thisDiscovery.inRange };
 
 				i++; responseLength++;
 				callback(null,modLUT);
@@ -207,17 +210,6 @@ function wellKnown(res,index=null){
 }
 
 function isNumeric(str){ return !isNaN(str); }
-
-function requestComplete(response, status){
-	if(status == 0){
-		response.code = '2.01'; // message code complies with CoAP standards (success)
-	}else if(status == 1){
-		response.code = '4.01'; // message code complies with CoAP standards (client failure)
-	}else{
-		response.code = '5.01'; // message code complies with CoAP standards (server failure)
-	}
-	response.end('\n');
-}
 
 
 //Provide coap port
@@ -270,7 +262,8 @@ noble.on('discover', function(peripheral){
 			"peripheral": peripheral,
 			"info": peripheralInfo,
 			"inRange": true,
-			"lastSeen": Date.now()
+			"lastSeen": Date.now(),
+			"explored": false
 		});
 		console.log(chalk.magenta(JSON.stringify(peripheral.advertisement.serviceData)+'\n'+JSON.stringify(peripheral.advertisement.serviceUuids)));
 		var services = [];
@@ -328,6 +321,7 @@ function getServicesSync(index,response){
 
 							url_paths[services[i].uuid] = {};
 						}
+						discoveries[index].explored = true;
 						if(Object.keys(discoveries[index].paths).length < Object.keys(url_paths).length){
 							discoveries[index].paths = url_paths;
 							resolve(JSON.stringify(url_paths));
@@ -408,6 +402,7 @@ function getServices(index,response){
 							if(err){
 								reject(err);
 							}else{
+								discoveries[index].explored = true;
 								if(Object.keys(url_paths).length > Object.keys(discoveries[index].paths).length){
 									discoveries[index].paths = url_paths;
 								}

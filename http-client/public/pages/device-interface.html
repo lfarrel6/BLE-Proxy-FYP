@@ -19,24 +19,54 @@
 	<div class="dash-data-window two-col">
 		<img src="/assets/loading.gif" alt="loading" id="loading-gif">
 		<div class="serv-disp two-col-left">
+			<h3>Services</h3>
 			<ul id="services">
 			</ul>
 		</div>
 		<div class="chars-disp two-col-right">
-			<h3></h3>
+			<h3 id='selected-service'></h3>
 			<ul id="characteristics">
 			</ul>
 		</div>
 	</div>
 
 	<script type="text/javascript">
+
+		var chars = {};
+
+		function getCook(cookiename){
+  			// Get name followed by anything except a semicolon
+  			var cookiestring=RegExp(""+cookiename+"[^;]+").exec(document.cookie);
+  			// Return everything after the equal sign, or an empty string if the cookie name not found
+  			return decodeURIComponent(!!cookiestring ? cookiestring.toString().replace(/^[^=]+./,"") : "");
+  		}
+
+  		function displayChars(characteristics){
+  			for(var c in characteristics){
+				if(!document.getElementById(c)){
+
+					var newLI = document.createElement('li');
+					newLI.className = 'peripheral-li';
+					document.getElementById("characteristics").appendChild(newLI);
+
+					var charBtn = document.createElement('button');
+					charBtn.setAttribute('id',c);
+					charBtn.className='dashboard-buttons active';
+					charBtn.innerHTML = characteristics[c].name;
+
+					newLI.appendChild(charBtn);
+				}
+			}
+  		}
+
+
 		$(document).ready(function(){
+
+			document.getElementById('dash-title').innerHTML = getCook('device');
 
 			console.log('Document loaded, fetching data');
 			var splitURL = location.href.split('/');
 			var deviceID = splitURL[splitURL.length-1]
-
-			document.getElementById('dash-title').innerHTML = deviceID;
 
 			var ip = splitURL[splitURL.length-2];
 			console.log(ip);
@@ -77,35 +107,31 @@
 
 
 						$('#'+datum).click(function(){
-							$.get(location.href+'/'+$(this).prop('id')+'/getChars',null,function(characteristics){
-								console.log('RESPONSE: '+JSON.stringify(characteristics));
-								var charJSON;
-								try{
-									charJSON = JSON.parse(characteristics);
-									for(var c in charJSON){
-										console.log(c);
+							var service = $(this).prop('id');
+							console.log('chars: ' + JSON.stringify(chars));
+							if(chars[service]){
+								displayChars(chars[service]);
+							}else{
+								$.get(location.href+'/'+service+'/getChars',null,function(characteristics){
+									document.getElementById('selected-service').innerHTML = service;
+									console.log('RESPONSE: '+JSON.stringify(characteristics));
+									var charJSON;
+									try{
+										charJSON = JSON.parse(characteristics);
+										chars[service] = charJSON;
+										displayChars(chars[service]);
+									}catch(e){
 										var newLI = document.createElement('li');
-										document.getElementById("characteristics").appendChild(newLI);
-
+										document.getElementById('characteristics').appendChild(newLI);
+										
 										var charBtn = document.createElement('button');
-										charBtn.setAttribute('id',c);
 										charBtn.className='dashboard-buttons active';
-										charBtn.innerHTML = charJSON[c].name;
+										charBtn.innerHTML = characteristics;
 
 										newLI.appendChild(charBtn);
 									}
-								}catch(e){
-									var newLI = document.createElement('li');
-									document.getElementById('characteristics').appendChild(newLI);
-									
-									var charBtn = document.createElement('button');
-									charBtn.setAttribute('id',c);
-									charBtn.className='dashboard-buttons active';
-									charBtn.innerHTML = characteristics;
-
-									newLI.appendChild(charBtn);
-								}
-							});
+								});
+							}
 						});
 					}
 				}

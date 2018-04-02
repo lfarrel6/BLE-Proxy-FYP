@@ -75,7 +75,10 @@
 
 					datumBtn.className = "dashboard-buttons" + (data[datum].available?" active":" out-of-range");
 
-					$('#'+datumBtn.id).click(function(){ peripheralSelected($(this).parent().prop('id')); });
+					$('#'+datumBtn.id).click(function(){ 
+						document.cookie="device="+$(this).text();
+						peripheralSelected($(this).parent().prop('id')); 
+					});
 
 				}
 			}, 'json');
