@@ -2,15 +2,14 @@ var express = require('express');
 var router = express.Router();
 var coap = require('coap');
 var path = require('path');
-
-var ipAddr;
+var mqtt = require('mqtt');
 
 router.get('/:ip', function(req,res){
 	res.sendFile(path.join(__dirname, '/public/pages/dash.html'));
 });
 
 router.get('/:ip/observations',function(req,res){
-	ipAddr = req.params.ip;
+	var ipAddr = req.params.ip;
 
 	console.log(req.query);
 
@@ -64,9 +63,7 @@ router.get('/:ip/:device',function(req,res){
 });
 
 router.get('/:ip/:device/exp',function(req,res){
-	if(!ipAddr){
-		ipAddr = req.params.ip;
-	}
+	var ipAddr = req.params.ip;
 	var deviceID = req.params.device;
 
 	console.log('SENDING DEVICE EXPLORE REQUEST');
@@ -90,9 +87,8 @@ router.get('/:ip/:device/exp',function(req,res){
 });
 
 router.get('/:ip/:device/:service/getChars',function(req,res){
-	if(!ipAddr){ 
-		ipAddr = req.params.ip;
-	}
+	 
+	var ipAddr = req.params.ip;
 	var deviceID = req.params.device;
 	var service = req.params.service;
 	console.log('Getting characteristics for ' + service);
@@ -111,6 +107,20 @@ router.get('/:ip/:device/:service/getChars',function(req,res){
 		});
 	});
 	coapReq.end();
+});
+
+router.get('/:ip/:device/:service/:char/sub',function(req,res){
+
+	/**SUBSCRIBE TO TOPICS**/
+	var client = mqtt.connect('mqtt://'+req.params.ip+':1883');
+
+	client.on('connect',function(){
+		client.subscribe(req.params.device+'/'+req.params.service+'/'+req.params.char);
+	});
+	client.on('message',function(topic,message){
+		console.log(topic.toString() + ': ' + message.toString());
+	});
+
 });
 
 module.exports = router;
