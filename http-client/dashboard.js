@@ -111,7 +111,7 @@ router.get('/:ip/:device/:service/getChars',function(req,res){
 	coapReq.end();
 });
 
-router.get('/:ip/:device/:service/:char/sub',function(req,res){
+router.all('/:ip/:device/:service/:char/sub',function(req,res){
 
 	var address = 'mqtt://'+req.params.ip;
 
@@ -135,7 +135,7 @@ router.get('/:ip/:device/:service/:char/sub',function(req,res){
 
 });
 
-router.get('/:ip/:device/:service/:char/unsub',function(req,res){
+router.all('/:ip/:device/:service/:char/unsub',function(req,res){
 	var address = 'mqtt://'+req.params.ip;
 	if(clientManager.hasClient(address)){
 		clientManager.unsubscribe(address,req.params.device+'/'+req.params.service+'/'+req.params.char);

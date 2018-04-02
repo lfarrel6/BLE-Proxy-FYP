@@ -132,10 +132,7 @@ function get(url, response){
 						var argFour = splitUrl[3];
 						if(argFour == 'getChars'){
 
-							getCharacteristics(deviceJSON.peripheral, service, function(x){ 
-									response.write(x);
-									response.end();
-							});
+							getCharacteristics(deviceJSON.peripheral, service, response);
 
 						}else{
 							//get request to a characteristic is a read
@@ -200,7 +197,8 @@ function wellKnown(res,index=null){
 	getDiscoveries.then(function(result){
 		res.write(result);
 		res.end();
-	}).catch(function(err){
+	});
+	getDiscoveries.catch(function(err){
 		console.log(chalk.red(err));
 		res.write(err);
 		res.end();
@@ -349,12 +347,14 @@ function getServicesSync(index,response){
 	
 	retrieveServicesSync.then(function(result){
 
+		console.log('Successfully retrieved services sync');
 		requestedPeripheral.disconnect();
 		response.write(result);
 		response.end();
 		noble.startScanning();
 
-	}).catch(function(err){
+	});
+	retrieveServicesSync.catch(function(err){
 		
 		requestedPeripheral.disconnect();
 		response.write('Error: ' + err);
@@ -426,12 +426,14 @@ function getServices(index,response){
 
 	serviceRetrieval.then(function(results){
 		
+		console.log('Successfully retrieved services');
 		requestedPeripheral.disconnect();
 		response.write(results);
 		response.end();
 		noble.startScanning();
 
-	}).catch(function(error){
+	});
+	serviceRetrieval.catch(function(error){
 		
 		requestedPeripheral.disconnect();
 		response.write('Error: ' + error);
@@ -448,6 +450,8 @@ function getCharacteristics(peripheral, uuid, response){
 
 
 	var charsRetrieval = new Promise(function(resolve,reject){
+
+		//console.log('starting @ '+new Date());
 
 		peripheral.on('disconnect', function(){
 			console.log('Disconnect in getCharacteristics');
@@ -467,49 +471,61 @@ function getCharacteristics(peripheral, uuid, response){
 						reject(servicesErr);
 					}else{
 						console.log('Services length: ' + services.length);
-
-						for(var i = 0; i < services.length; i++){
-
-							var service = services[i];
-							service.discoverCharacteristics([],function(characteristicsErr,characteristics){
-								if(characteristicsErr){
-									
-									console.log(chalk.red('Error discovering characteristics: ' + characteristicsErr));
-									reject(characteristicsErr);
-
-								}else{
-
-									console.log(chalk.bgCyan(characteristics));
-									var results = {};
-									for(var j = 0; j < characteristics.length; j++){
-										var thisChar = characteristics[j];
-										results[thisChar.uuid] = thisChar.name;
+						var results = {};
+						var i = 0;
+						async.whilst(
+							function(){ return i < services.length; },
+							function(callback){
+								var service = services[i];
+								service.discoverCharacteristics([],function(characteristicsErr,characteristics){
+									if(characteristicsErr){
+										callback(characteristicsErr);
+									}else{
+										for(var j = 0; j < characteristics.length; j++){
+											var thisChar = characteristics[j];
+											results[thisChar.uuid] = {
+												name: thisChar.name,
+												properties: thisChar.properties
+											};
+										}
+										i++;
+										callback(null,JSON.stringify(results));
 									}
-
-									resolve(JSON.stringify(results));
-
+								});
+							},
+							function(err,res){
+								if(err){
+									reject(err);
+								}else{
+									resolve(res);
 								}
-							})
-
-						}
+							}
+						);
 					}
 
 				});
 			}
-		})
+		});
 
-		setTimeout(reject('Timeout'), 45000);
+		/*setTimeout(function(){
+			console.log('Timing out @ ' + new Date());
+			reject('Timeout');
+		}, 45000);*/
 	});
 
 	charsRetrieval.then(function(results){
+		console.log('Successfully retrieved characteristics');
+
 		peripheral.disconnect();
 		response.write(results);
 		response.end();
 		noble.startScanning();
-	}).catch(function(error){
+	
+	});
+	charsRetrieval.catch(function(error){
 
 		peripheral.disconnect();
-		response.write('Error: ' + results);
+		response.write('Error: ' + error);
 		response.end();
 		noble.startScanning();
 

@@ -79,16 +79,29 @@
 						$('#'+datum).click(function(){
 							$.get(location.href+'/'+$(this).prop('id')+'/getChars',null,function(characteristics){
 								console.log('RESPONSE: '+JSON.stringify(characteristics));
-								var charJSON = JSON.parse(characteristics);
-								for(var c in charJSON){
-									console.log(c);
-									var newLI = document.createElement('li');
-									document.getElementById("characteristics").appendChild(newLI);
+								var charJSON;
+								try{
+									charJSON = JSON.parse(characteristics);
+									for(var c in charJSON){
+										console.log(c);
+										var newLI = document.createElement('li');
+										document.getElementById("characteristics").appendChild(newLI);
 
+										var charBtn = document.createElement('button');
+										charBtn.setAttribute('id',c);
+										charBtn.className='dashboard-buttons active';
+										charBtn.innerHTML = charJSON[c].name;
+
+										newLI.appendChild(charBtn);
+									}
+								}catch(e){
+									var newLI = document.createElement('li');
+									document.getElementById('characteristics').appendChild(newLI);
+									
 									var charBtn = document.createElement('button');
 									charBtn.setAttribute('id',c);
 									charBtn.className='dashboard-buttons active';
-									charBtn.innerHTML = charJSON[c];
+									charBtn.innerHTML = characteristics;
 
 									newLI.appendChild(charBtn);
 								}

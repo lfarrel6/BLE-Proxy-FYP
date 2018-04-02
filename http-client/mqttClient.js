@@ -1,5 +1,5 @@
 var mqtt = require('mqtt');
-var EventEmitter = require('events');
+var events = require('events');
 var clients = {};
 
 var MQTTClient = function(){
@@ -55,3 +55,5 @@ MQTTClient.prototype.unsubscribe = function(addr,topic){
 		});
 	}
 }
+
+module.exports = MQTTClient;
