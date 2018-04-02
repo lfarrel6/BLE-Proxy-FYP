@@ -2,7 +2,9 @@ var express = require('express');
 var router = express.Router();
 var coap = require('coap');
 var path = require('path');
-var mqtt = require('mqtt');
+var MQTTClient = require('./MQTTClient');
+
+var clientManager = new MQTTClient();
 
 router.get('/:ip', function(req,res){
 	res.sendFile(path.join(__dirname, '/public/pages/dash.html'));
@@ -111,16 +113,36 @@ router.get('/:ip/:device/:service/getChars',function(req,res){
 
 router.get('/:ip/:device/:service/:char/sub',function(req,res){
 
-	/**SUBSCRIBE TO TOPICS**/
-	var client = mqtt.connect('mqtt://'+req.params.ip+':1883');
+	var address = 'mqtt://'+req.params.ip;
 
-	client.on('connect',function(){
-		client.subscribe(req.params.device+'/'+req.params.service+'/'+req.params.char);
+	/**SUBSCRIBE TO TOPICS**/
+	if(!clientManager.hasClient(address)){
+		clientManager.createClient(address,1883);
+		clientManager.on('error',(err) => {
+			console.log(err);
+		});
+	}
+
+	clientManager.on('connect',function(){
+		clientManager.subscribe(address,req.params.device+'/'+req.params.service+'/'+req.params.char);
+		clientManager.on('subscribe',() => {
+			console.log('Subscribed')
+		});
 	});
-	client.on('message',function(topic,message){
+	clientManager.on('message',function(topic,message){
 		console.log(topic.toString() + ': ' + message.toString());
 	});
 
+});
+
+router.get('/:ip/:device/:service/:char/unsub',function(req,res){
+	var address = 'mqtt://'+req.params.ip;
+	if(clientManager.hasClient(address)){
+		clientManager.unsubscribe(address,req.params.device+'/'+req.params.service+'/'+req.params.char);
+		clientManager.on('unsubscribe',() => {
+			console.log('Successfully unsubscribed');
+		});
+	}
 });
 
 module.exports = router;
