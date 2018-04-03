@@ -2,13 +2,13 @@ var mqtt = require('mqtt');
 var events = require('events');
 var clients = {};
 
-var MQTTClient = function(){
+var MQTTManager = function(){
 	this.clients = {}; //one client per mqttserver
 };
 
-MQTTClient.prototype = new events.EventEmitter;
+MQTTManager.prototype = new events.EventEmitter;
 
-MQTTClient.prototype.hasClient = function(addr){
+MQTTManager.prototype.hasClient = function(addr){
 	var self = this;
 	if(self.clients[addr]){
 		return true;
@@ -17,7 +17,7 @@ MQTTClient.prototype.hasClient = function(addr){
 	}
 }
 
-MQTTClient.prototype.createClient = function(addr,port=1883){
+MQTTManager.prototype.createClient = function(addr,port=1883){
 	var self = this;
 	self.clients[addr] = mqtt.connect(addr+':'+port);
 	self.clients[addr].on('connect',function(){
@@ -30,7 +30,7 @@ MQTTClient.prototype.createClient = function(addr,port=1883){
 	});
 }
 
-MQTTClient.prototype.subscribe = function(addr,topic){
+MQTTManager.prototype.subscribe = function(addr,topic){
 	var self = this;
 	if(self.clients[addr]){
 		self.clients[addr].subscribe(topic,function(subErr){
@@ -43,7 +43,7 @@ MQTTClient.prototype.subscribe = function(addr,topic){
 	}
 }
 
-MQTTClient.prototype.unsubscribe = function(addr,topic){
+MQTTManager.prototype.unsubscribe = function(addr,topic){
 	var self = this;
 	if(self.clients[addr].connected){
 		self.clients[addr].unsubscribe(topic, function(unsubErr){
@@ -56,4 +56,4 @@ MQTTClient.prototype.unsubscribe = function(addr,topic){
 	}
 }
 
-module.exports = MQTTClient;
+module.exports = MQTTManager;

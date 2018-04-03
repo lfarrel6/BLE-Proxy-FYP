@@ -2,9 +2,9 @@ var express = require('express');
 var router = express.Router();
 var coap = require('coap');
 var path = require('path');
-var MQTTClient = require('./MQTTClient');
+var MQTTClient = require('./MQTTManager');
 
-var clientManager = new MQTTClient();
+var clientManager = new MQTTManager();
 
 router.get('/:ip', function(req,res){
 	res.sendFile(path.join(__dirname, '/public/pages/dash.html'));
