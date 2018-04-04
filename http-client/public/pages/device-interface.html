@@ -16,6 +16,15 @@
 		<h1 id='dash-title'></h1>
 	</div>
 
+	<div id='characteristic-popup'>
+		<div id='characteristic-interface-wrapper'>
+			<span id='close-characteristic'>X</span>
+			<div id='characteristic-interface'>
+				<h3 id='characteristic-interface-heading'></h3>
+			</div>
+		</div>
+	</div>
+
 	<div class="dash-data-window two-col">
 		<img src="/assets/loading.gif" alt="loading" id="loading-gif">
 		<div class="serv-disp two-col-left">
@@ -60,6 +69,18 @@
 					charBtn.innerHTML = characteristics[c].name;
 
 					newLI.appendChild(charBtn);
+
+					$('#'+c).click(function(){
+
+						var characteristic = $(this).prop('id');
+						console.log(characteristic + ' selected');
+
+						document.getElementById('characteristic-interface-heading').innerHTML = characteristic;
+
+						//render pop up interface
+						document.getElementById('characteristic-popup').style.display = 'block';
+
+					});
 				}
 			}
   		}

@@ -22,7 +22,7 @@ var mosca = require('mosca');
 var ascoltatore = config.mqttBackend;
 
 var settings = {
-  port: mqttPort,
+  port: config.mqttPort,
   backend: ascoltatore
 };
 

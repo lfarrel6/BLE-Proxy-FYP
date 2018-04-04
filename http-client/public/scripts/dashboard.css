@@ -80,3 +80,33 @@
 #characteristics > li{
 	list-style: none;
 }
+
+#characteristic-popup{
+	display: none;
+	height: 100%;
+	width: 100%;
+	top:0;
+	left:0;
+	position: fixed;
+	background-color: rgba(0,0,0,0.5);
+}
+#characteristic-interface-wrapper{
+	display:grid;
+	grid-template-columns: 1fr 4fr 1fr;
+	grid-template-rows: 1fr 4fr 1fr;
+	grid-template-areas: '. . x'
+						 '. center .'
+						 '. . .';
+}
+#close-characteristic{
+	grid-area:x;
+	text-align: center;
+	cursor: pointer;
+	padding: 2em;
+}
+#characteristic-interface{
+	grid-area: center;
+	text-align: center;
+	background-color:#fff;
+	color:#000;
+}

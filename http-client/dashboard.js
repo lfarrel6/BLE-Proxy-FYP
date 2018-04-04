@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 var coap = require('coap');
 var path = require('path');
-var MQTTClient = require('./MQTTManager');
+var MQTTManager = require('./MQTTManager');
 
 var clientManager = new MQTTManager();
 

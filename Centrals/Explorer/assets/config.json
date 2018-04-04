@@ -1,11 +1,11 @@
 {
-	'allowedDevices': [],
-	'coapPort': 5683,
-	'mqttPort': 1883,
-	'mqttBackend': {
-		'type': 'mongo',
-  		'url': "mongodb://localhost:27017/fypdb",
-		'pubsubCollection': "ascoltatori",
-		'mongo': {}
+	"allowedDevices": [],
+	"coapPort": 5683,
+	"mqttPort": 1883,
+	"mqttBackend": {
+		"type": "mongo",
+  		"url": "mongodb://localhost:27017/fypdb",
+		"pubsubCollection": "ascoltatori",
+		"mongo": {}
 	}
 }
