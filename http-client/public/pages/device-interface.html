@@ -18,7 +18,7 @@
 
 	<div id='characteristic-popup'>
 		<div id='characteristic-interface-wrapper'>
-			<span id='close-characteristic'>X</span>
+			<span id='close-characteristic' onclick="closePopUp()">X</span>
 			<div id='characteristic-interface'>
 				<h3 id='characteristic-interface-heading'></h3>
 			</div>
@@ -75,7 +75,7 @@
 						var characteristic = $(this).prop('id');
 						console.log(characteristic + ' selected');
 
-						document.getElementById('characteristic-interface-heading').innerHTML = characteristic;
+						document.getElementById('characteristic-interface-heading').innerHTML = $('#'+characteristic).text();
 
 						//render pop up interface
 						document.getElementById('characteristic-popup').style.display = 'block';
@@ -83,6 +83,10 @@
 					});
 				}
 			}
+  		}
+
+  		function closePopUp(){
+  			$('#characteristic-popup').hide();
   		}
 
 
