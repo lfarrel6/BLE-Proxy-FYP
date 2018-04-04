@@ -10,7 +10,8 @@ var noble                      = require('noble')
   , services_lookup_table      = require('./assets/services-lut.json')
   , reverse_services_lut       = require('./assets/reversed-services-lut.json')
   , chars_lut                  = require('./assets/characteristic-lut.json')
-  , reverse_chars_lut          = require('./assets/reversed-characteristics-lut.json');
+  , reverse_chars_lut          = require('./assets/reversed-characteristics-lut.json')
+  , config                     = require('./assets/config.json');
 
 /**
 START MQTT SERVER
@@ -18,16 +19,10 @@ START MQTT SERVER
 
 var mosca = require('mosca');
 
-var ascoltatore = {
-  //using ascoltatore
-  type: 'mongo',
-  url: 'mongodb://localhost:27017/fypdb',
-  pubsubCollection: 'ascoltatori',
-  mongo: {}
-};
+var ascoltatore = config.mqttBackend;
 
 var settings = {
-  port: 1883,
+  port: mqttPort,
   backend: ascoltatore
 };
 
@@ -218,7 +213,7 @@ function isNumeric(str){ return !isNaN(str); }
 
 
 //Provide coap port
-server.listen(5683, function(){
+server.listen(config.coapPort, function(){
 	console.log(chalk.green('> Server started.'));
 });
 
@@ -234,7 +229,7 @@ noble.on('stateChange', function(state){
 	console.log(chalk.green('> State Change Event... ' + state));
 	if(state === 'poweredOn'){
 		//Search for any uuid, don't accept duplicates
-		noble.startScanning([], true);
+		noble.startScanning(config.allowedDevices, true);
 	} else{ 
 		noble.stopScanning();
 	}
