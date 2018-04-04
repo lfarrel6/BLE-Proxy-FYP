@@ -21,6 +21,10 @@
 			<span id='close-characteristic' onclick="closePopUp()">X</span>
 			<div id='characteristic-interface'>
 				<h3 id='characteristic-interface-heading'></h3>
+				<div id='characteristic-interaction-panel'>
+					<ul id='characteristic-btn-list' class='btn-list'>
+					</ul>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -80,9 +84,49 @@
 						//render pop up interface
 						document.getElementById('characteristic-popup').style.display = 'block';
 
+						var btnList = document.getElementById('characteristic-btn-list');
+						for(var btnChildI = 0; btnChildI < btnList.children.length; btnChildI++){
+							console.log(btnChildI);
+							btnList.removeChild(btnList.children[btnChildI]);
+						}
+
+						for(var prop in characteristics[characteristic].properties){
+							var listElem = document.createElement('li');
+							listElem.setAttribute('id',prop);
+
+							btnList.appendChild(listElem);
+
+							var interactionBtn = document.createElement('button');
+							interactionBtn.className='dashboard-buttons active';
+
+							interactionBtn.innerHTML = characteristics[characteristic].properties[prop];
+
+							listElem.appendChild(interactionBtn);
+
+							$('#'+prop).click(function(){
+
+								//run request
+								console.log($(this).text());
+								driveInteraction($(this).text());
+
+							});
+
+						}
+
 					});
 				}
 			}
+  		}
+
+  		function driveInteraction(service,characteristic,requestType){
+  			var url = location.href+'/'+service+'/'+characteristic+'/';
+  			if(requestType=='read'){
+  				url+='read';
+  			}else if(requestType=='notify'||requestType=='indicate'){
+  				url+='sub';
+  			}else if(requestType=='write'||requestType=='writeWithoutResponse'){
+  				url+='write';
+  			}
   		}
 
   		function closePopUp(){

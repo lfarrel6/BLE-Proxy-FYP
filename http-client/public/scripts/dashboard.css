@@ -92,8 +92,8 @@
 }
 #characteristic-interface-wrapper{
 	display:grid;
-	grid-template-columns: 1fr 4fr 1fr;
-	grid-template-rows: 1fr 4fr 1fr;
+	grid-template-columns: 1fr 5fr 1fr;
+	grid-template-rows: 1fr 5fr 1fr;
 	grid-template-areas: '. . x'
 						 '. center .'
 						 '. . .';
@@ -109,4 +109,12 @@
 	text-align: center;
 	background-color:#fff;
 	color:#000;
+}
+#characteristic-interaction-panel{
+	display: inline;
+	float: left;
+}
+.btn-list>li{
+	list-style: none;
+	margin: 2em;
 }

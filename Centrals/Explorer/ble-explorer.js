@@ -101,7 +101,8 @@ function get(url, response){
 				//explore this device
 
 				if(discoveries[deviceId]){
-					if(discoveries[deviceId].explored){
+					//if(discoveries[deviceId].explored){
+					if(discoveries[deviceId].paths){
 						response.write(JSON.stringify(discoveries[deviceId].paths));
 						response.end();
 					}else{
@@ -266,20 +267,20 @@ noble.on('discover', function(peripheral){
 			"explored": false
 		});
 		console.log(chalk.magenta(JSON.stringify(peripheral.advertisement.serviceData)+'\n'+JSON.stringify(peripheral.advertisement.serviceUuids)));
-		var services = [];
+		var services = {};
 		if(peripheral.advertisement.serviceData && peripheral.advertisement.serviceData.length > 0){
 			
 			for(var s in peripheral.advertisement.serviceData){
-				services.push(peripheral.advertisement.serviceData[s].uuid);
+				services[(peripheral.advertisement.serviceData[s].uuid)]={};
 			}
 			console.log(chalk.magenta('Advertisement Services: ' + services));
 		}
 		if(peripheral.advertisement.serviceUuids && peripheral.advertisement.serviceUuids.length > 0){
 			for(var uuid in peripheral.advertisement.serviceUuids){
-				services.push(peripheral.advertisement.serviceUuids[uuid]);
+				services[(peripheral.advertisement.serviceUuids[uuid])]={};
 			}
 		}
-		if(services.length>0){
+		if(Object.keys(services).length>0){
 			discoveries[this_index].paths = services;
 		}
 
