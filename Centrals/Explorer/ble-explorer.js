@@ -126,6 +126,23 @@ function get(url, response){
 				console.log(chalk.inverse('paths[service] = ' + JSON.stringify(deviceJSON.paths[service])));
 				if(deviceJSON && deviceJSON.paths[service]){
 
+
+					if(splitUrl.length == 5 && (splitUrl[4] == 'read' || splitUrl[4] == 'sub')){
+						switch(splitUrl[4]){
+							case 'read':
+								
+								console.log('read');
+								read(response,deviceJSON.peripheral,service,splitUrl[3]);
+								console.log('post read');
+								break;
+							case 'sub':
+							
+								console.log('sub');
+
+								break;
+						}
+					}
+
 					if(deviceJSON.inRange){
 						console.log(chalk.inverse('Device in range'));
 						var argFour = splitUrl[3];
@@ -323,7 +340,7 @@ function getServicesSync(index,response){
 							url_paths[services[i].uuid] = {};
 						}
 						discoveries[index].explored = true;
-						if(Object.keys(discoveries[index].paths).length < Object.keys(url_paths).length){
+						if((discoveries[index].paths) && Object.keys(discoveries[index].paths).length < Object.keys(url_paths).length){
 							discoveries[index].paths = url_paths;
 							resolve(JSON.stringify(url_paths));
 						}else{
@@ -482,6 +499,7 @@ function getCharacteristics(index, uuid, response){
 									}else{
 										for(var j = 0; j < characteristics.length; j++){
 											var thisChar = characteristics[j];
+											console.log(chalk.magenta(thisChar.uuid));
 											results[thisChar.uuid] = {
 												name: thisChar.name,
 												properties: thisChar.properties
@@ -536,23 +554,21 @@ function getCharacteristics(index, uuid, response){
 /*
 read given characteristic
 */
-function read(response, deviceJSON, service, characteristic){
+function read(response, peripheral, service, characteristic){
 	noble.stopScanning();
 	console.log('Reading characteristic ' + characteristic);
-
-	var peripheral = deviceJSON.peripheral;
 
 	var readChar = new Promise(function(resolve,reject){
 
 		peripheral.on('disconnect',function(){
 			console.log('Disonnect in read');
 		});
-
+		console.log('Connecting in read...');
 		peripheral.connect(function(connErr){
 
 			if(connErr){
 			
-				console.log('Connection eror in read: ' + connErr);
+				console.log('Connection error in read: ' + connErr);
 				reject(connErr);
 			
 			}else{
@@ -563,80 +579,51 @@ function read(response, deviceJSON, service, characteristic){
 						console.log('Service discovery error: ' + serviceErr);
 						reject(serviceErr);
 					}else{
-						var i = 0;
-						async.whilst(
-							function(){ return i < services.length; },
-							function(callback){
-								var service = services[i];
-								i++;
-								service.discoverCharacteristics([characteristic], function(charErr,characteristics){
+						
+						for(var i = 0; i < services.length; i++){
+							var service = services[i];
+							service.discoverCharacteristics([characteristic], function(charErr,characteristics){
 
-									if(charErr){
-										console.log(chalk.red('Characteristic discovery error: ' + charErr));
-										reject(charEr);
-									}else{
+								if(charErr){
+									console.log(chalk.red('Characteristic discovery error: ' + charErr));
+									reject(charErr);
+								}else{
 
-										var responseData, j = 0;
+									var responseData, j = 0;
 
-										async.whilst(
-											function(){ return j < characteristics.length; },
-											function(nested_callback){
-												var c = characteristics[j];
+									for(var j = 0; j < characteristics.length; j++){
+										var c = characteristics[j];
 
-												c.read(function(err,data){
-													if(err){
-														console.log(chalk.red('Error in read: ' + err));
-														reject(err);
-													}else{
+										c.on('data',function(data,isNotification){
+											resolve(data);
+										});
 
-														responseData+=data;
-														j++;
-														nested_callback(null,responseData);
-
-													}
-												});
-											},
-											function(error,result){
-												if(error){
-													reject(error);
-												}else{
-													resolve(JSON.stringify(result));
-												}
-											}
-										);
-
+										c.read();
 									}
 
-								});
-							},
-							function(error,results){
-								if(error){
-									reject(error);
-								}else{
-									resolve(JSON.stringify(results));
 								}
-							}
-						);
+							});
+						}
+
 					}
-
 				});
-
 			}
 
 		});
-
-		setTimeout(reject('Timeout'),90000); // timeout after a minute and a half
 
 	});
 
 	readChar.then(function(result){
 		
 		peripheral.disconnect();
-		response.write(result);
+		console.log('Promise fulfilled');
+		response.write(JSON.stringify(result));
 		response.end();
 		noble.startScanning();
 
 	}).catch(function(error){
+
+		console.log('Error: ' + error);
 
 		peripheral.disconnect();
 		response.write(error);

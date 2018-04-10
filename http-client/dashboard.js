@@ -64,6 +64,32 @@ router.get('/:ip/:device',function(req,res){
 	res.sendFile(path.join(__dirname, '/public/pages/device-interface.html'));
 });
 
+router.get('/:ip/:device/:service/:char/read',function(req,res){
+	var ipAddr = req.params.ip;
+	var deviceID = req.params.device;
+	var service = req.params.service;
+	var characteristic = req.params.char;
+
+	var coapUrl = 'coap://'+ipAddr+':5683/'+deviceID+'/'+service+'/'+characteristic+'/read';
+	var coapReq = coap.request(coapUrl);
+
+	coapReq.on('response', function(coapRes){
+
+		coapReq.setEncoding('utf8');
+
+		coapRes.on('data',function(chunk){
+			res.write(chunk);
+		});
+
+		coapRes.on('end',function(){
+			res.end();
+		});
+
+	});
+	coapReq.end();
+
+});
+
 router.get('/:ip/:device/exp',function(req,res){
 	var ipAddr = req.params.ip;
 	var deviceID = req.params.device;

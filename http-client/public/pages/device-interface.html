@@ -106,8 +106,9 @@
 							$('#'+prop).click(function(){
 
 								//run request
-								console.log($(this).text());
-								driveInteraction($(this).text());
+								console.log($(this).text() + ' ' + characteristic);
+								var service = document.getElementById('selected-service').innerHTML;
+								driveInteraction(service,characteristic,$(this).text());
 
 							});
 
@@ -127,6 +128,9 @@
   			}else if(requestType=='write'||requestType=='writeWithoutResponse'){
   				url+='write';
   			}
+  			$.get(url,null,function(data){
+  				console.log('Response: ' + data);
+  			});
   		}
 
   		function closePopUp(){
