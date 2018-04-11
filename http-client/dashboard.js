@@ -90,6 +90,57 @@ router.get('/:ip/:device/:service/:char/read',function(req,res){
 
 });
 
+router.get('/:ip/:device/:service/:char/sub',function(req,res){
+	var ipAddr = req.params.ip;
+	var deviceID = req.params.device;
+	var service = req.params.service;
+	var characteristic = req.params.char;
+
+	console.log('subbing');
+
+	if(!clientManager.hasClient(ipAddr)){
+		clientManager.createClient(ipAddr);
+		console.log('client created');
+		clientManager.on('connect',function(){
+			console.log(' >>> connected')
+		});
+
+		clientManager.on('message',function(addr,topic,message){
+			console.log(addr + ' ' + topic + ' says ' + message);
+		});
+
+		clientManager.on('error',function(e){
+			console.log(e);
+		})
+	}
+
+	var coapUrl = 'coap://'+ipAddr+':5683/'+deviceID+'/'+service+'/'+characteristic+'/sub';
+	var coapReq = coap.request(coapUrl);
+
+	var result = '';
+
+	coapReq.on('response', function(coapRes){
+
+		coapReq.setEncoding('utf8');
+
+		coapRes.on('data',function(chunk){
+			res.write(chunk);
+		});
+
+		coapRes.on('end',function(){
+			var topic = deviceID+'/'+service+'/'+characteristic;
+			clientManager.subscribe(ipAddr,topic);
+			clientManager.on('subscribe',function(){
+				console.log('subscribed');
+				res.end();
+			});
+		});
+
+	});
+	coapReq.end();
+
+});
+
 router.get('/:ip/:device/exp',function(req,res){
 	var ipAddr = req.params.ip;
 	var deviceID = req.params.device;

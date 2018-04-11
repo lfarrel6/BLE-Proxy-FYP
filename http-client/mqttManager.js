@@ -19,7 +19,8 @@ MQTTManager.prototype.hasClient = function(addr){
 
 MQTTManager.prototype.createClient = function(addr,port=1883){
 	var self = this;
-	self.clients[addr] = mqtt.connect(addr+':'+port);
+	self.clients[addr] = mqtt.connect('mqtt://'+addr+':'+port);
+	self.clients[addr].subscriptions = [];
 	self.clients[addr].on('connect',function(){
 		console.log('Client connected to ' + addr + ' on ' + port);
 		self.emit('connect');
@@ -37,6 +38,7 @@ MQTTManager.prototype.subscribe = function(addr,topic){
 			if(subErr){
 				self.emit('error',subErr);
 			}else{
+				self.clients[addr].subscriptions.push(topic);
 				self.emit('subscribe');
 			}
 		});
@@ -54,6 +56,11 @@ MQTTManager.prototype.unsubscribe = function(addr,topic){
 			}
 		});
 	}
+}
+
+MQTTManager.prototype.isSubscribed = function(addr,topic){
+	var self = this;
+	return self.clients[addr].subscriptions.includes(topic);
 }
 
 module.exports = MQTTManager;

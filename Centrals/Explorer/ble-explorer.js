@@ -29,7 +29,7 @@ var settings = {
 var mqttServer = new mosca.Server(settings);
 
 mqttServer.on('clientConnected', function(client) {
-    console.log('client connected', client.id);
+    console.log(chalk.inverse('client connected', client.id));
 });
 
 // fired when a message is received
@@ -133,19 +133,8 @@ function get(url, response){
 							read(response,deviceJSON.peripheral,service,splitUrl[3]);
 						}else if(splitUrl[4] == 'sub'){
 							console.log('sub');
+							subscribe(deviceJSON,service,splitUrl[3],response);
 						}
-						/*switch(splitUrl[4]){
-							case 'read':
-								
-								console.log('read');
-								readSync(response,deviceJSON.peripheral,service,splitUrl[3]);
-								break;
-							case 'sub':
-							
-								console.log('sub');
-
-								break;
-						}*/
 					} else if(deviceJSON.inRange){
 						console.log(chalk.inverse('Device in range'));
 						var argFour = splitUrl[3];
@@ -158,10 +147,6 @@ function get(url, response){
 								getCharacteristics(deviceId, service, response);
 							}
 
-						}else{
-							//get request to a characteristic is a read
-					
-							read(response,deviceJSON,service,characteristic);
 						}
 					}else{
 						response.write("Device has gone out of range");
@@ -216,13 +201,12 @@ function wellKnown(res,index=null){
 			}
 		);
 		//if function doesn't complete in 15 seconds, force timeout
-		setTimeout(reject('Timeout'),15000);
+		setTimeout(reject('Timeout'),10000);
 	});
 	getDiscoveries.then(function(result){
 		res.write(result);
 		res.end();
-	});
-	getDiscoveries.catch(function(err){
+	}).catch(function(err){
 		console.log(chalk.red(err));
 		res.write(err);
 		res.end();
@@ -472,10 +456,6 @@ function getCharacteristics(index, uuid, response){
 
 		//console.log('starting @ '+new Date());
 
-		peripheral.on('disconnect', function(){
-			console.log('Disconnect in getCharacteristics');
-		});
-
 		peripheral.connect(function(connectErr){
 
 			if(connectErr){
@@ -536,7 +516,9 @@ function getCharacteristics(index, uuid, response){
 	charsRetrieval.then(function(results){
 		console.log('Successfully retrieved characteristics');
 
-		peripheral.disconnect();
+		peripheral.disconnect(function(e){
+			console.log('disconnected in characteristic retrieval');
+		});
 		discoveries[index].paths[uuid] = results;
 		response.write(results);
 		response.end();
@@ -545,7 +527,9 @@ function getCharacteristics(index, uuid, response){
 	});
 	charsRetrieval.catch(function(error){
 
-		peripheral.disconnect();
+		peripheral.disconnect(function(e){
+			console.log('disconnected in characteristic retrieval');
+		});
 		response.write('Error: ' + error);
 		response.end();
 		noble.startScanning();
@@ -603,17 +587,8 @@ function read(response, peripheral, service, characteristic){
 
 												var c = characteristics[j++];
 
-												/*c.on('data', function(data){
-													nested_callback(null,data);
-												});*/
-
-												c.read(function(readErr,data){
-													if(readErr){
-														nested_callback(readErr);
-													}else{
-														nested_callback(null,data);
-													}
-												});
+												var readValue = readData(c);
+												nested_callback(readValue);
 											},
 											function(readErr,readResults){
 												if(readErr){
@@ -670,6 +645,16 @@ function read(response, peripheral, service, characteristic){
 
 }
 
+function readData(c){
+	c.read(function(readErr,data){
+		if(readErr){
+			return readErr;
+		}else{
+			return data.readInt16BE(0);
+		}
+	});
+}
+
 function readSync(response, peripheral, service, characteristic){
 	noble.stopScanning();
 	console.log('Synchronous Reading characteristic ' + characteristic);
@@ -709,23 +694,9 @@ function readSync(response, peripheral, service, characteristic){
 									for(var j = 0; j < characteristics.length; j++){
 										var c = characteristics[j];
 
-										console.log('iterating chars in read sync');
-
-										/*c.on('data', function(data, isNotification){
-											console.log(data);
-											resolve(data);
-										});*/
-
-										c.read(function(readErr,data){
-											if(readErr){
-												console.log(chalk.red('reading error: ' + readErr));
-												reject(readErr);
-											}else{
-												console.log('Data: ' + data);
-												readVal = data;
-												resolve(data);
-											}
-										});
+										console.log('Awaiting...');
+										resolve(readData(c));
+										
 									}
 
 								}
@@ -744,11 +715,9 @@ function readSync(response, peripheral, service, characteristic){
 
 		setTimeout(function(){
 			console.log('timeout');
-			if(readVal){
-				resolve(readVal);	
-			}else{
-				reject('timeout');
-			}
+			response.write('timeout');
+			response.end();
+			return;
 			
 		}, 60000);
 
@@ -771,7 +740,7 @@ function readSync(response, peripheral, service, characteristic){
 	});
 }
 
-function subscribe(deviceJSON,service,char){
+function subscribe(deviceJSON,service,char,response){
 	noble.stopScanning();
 	var peripheral = deviceJSON.peripheral;
 
@@ -851,26 +820,20 @@ function subscribe(deviceJSON,service,char){
 
 		});
 
-		setTimeout(reject('timeout'),60000);
-
 	});
 
 	subPromise.then(function(results){
 		console.log('Subscribe: '+results);
+		peripheral.disconnect();
+		response.write(results);
+		response.end();
+		noble.startScanning();
 	}).catch(function(error){
 		console.log('Subscribe: '+error);
+		peripheral.disconnect();
+		response.write(error);
+		response.end();
+		noble.startScanning();
 	});
 
 }
-
-/*
-setInterval(function(){
-	for(var id in discoveries){
-		if(discoveries[id].lastSeen < (Date.now() - proximity_timeout) && discoveries[id]["inRange"]){
-			console.log(chalk.green('> Lost peripheral ' + discoveries[id].info));
-			discoveries[id]["inRange"] = false;
-			console.log(chalk.cyan(discoveries[id]["inRange"]));
-		}
-	}
-}, proximity_timeout/2); //check list every 1000ms to see if devices have been lost
-*/

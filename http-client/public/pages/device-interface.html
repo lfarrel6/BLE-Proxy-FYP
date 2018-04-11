@@ -121,15 +121,22 @@
 
   		function driveInteraction(service,characteristic,requestType){
   			var url = location.href+'/'+service+'/'+characteristic+'/';
+  			var sub = false;
   			if(requestType=='read'){
   				url+='read';
   			}else if(requestType=='notify'||requestType=='indicate'){
   				url+='sub';
+  				sub = true;
   			}else if(requestType=='write'||requestType=='writeWithoutResponse'){
   				url+='write';
   			}
   			$.get(url,null,function(data){
   				console.log('Response: ' + data);
+  				if(sub){
+  					setInterval(
+  						getMessages();
+  					,10000);
+  				}
   			});
   		}
 
