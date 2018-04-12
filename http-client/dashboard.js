@@ -141,6 +141,22 @@ router.get('/:ip/:device/:service/:char/sub',function(req,res){
 
 });
 
+router.get('/:ip/:device/:service/:char/sub/msg',function(req,res){
+	var ipAddr = req.params.ip;
+	var device = req.params.device;
+	var service = req.params.service;
+	var char = req.params.char;
+
+	var topic = device+'/'+service+'/'+char;
+
+	if(clientManager.hasClient(ipAddr) && clientManager.isSubscribed(ipAddr,topic)){
+		res.write(clientManager.getMessages(ipAddr,topic));
+	}else{
+		res.write('Subscription not found');
+	}
+	res.end();
+}
+
 router.get('/:ip/:device/exp',function(req,res){
 	var ipAddr = req.params.ip;
 	var deviceID = req.params.device;

@@ -25,6 +25,7 @@
 					<ul id='characteristic-btn-list' class='btn-list'>
 					</ul>
 				</div>
+				<h3 id='characteristic-data-display'></h3>
 			</div>
 		</div>
 	</div>
@@ -136,14 +137,21 @@
   					setInterval(
   						function(){
   							console.log('Poll');
-  							//getMessages();
+  							getMessages(url+'/msg');
   						}
   					,10000);
+  				}else{
+  					//to be changed
+  					document.getElementById('characteristic-data-display').innerHTML = data.data;
   				}
   			});
   		}
 
-
+  		function getMessages(url){
+  			$.get(url,null,function(data){
+  				console.log(data);
+  			});
+  		}
 
   		function closePopUp(){
   			$('#characteristic-popup').hide();
