@@ -134,11 +134,16 @@
   				console.log('Response: ' + data);
   				if(sub){
   					setInterval(
-  						getMessages();
+  						function(){
+  							console.log('Poll');
+  							//getMessages();
+  						}
   					,10000);
   				}
   			});
   		}
+
+
 
   		function closePopUp(){
   			$('#characteristic-popup').hide();

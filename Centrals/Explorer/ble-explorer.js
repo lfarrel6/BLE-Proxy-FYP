@@ -13,6 +13,38 @@ var noble                      = require('noble')
   , reverse_chars_lut          = require('./assets/reversed-characteristics-lut.json')
   , config                     = require('./assets/config.json');
 
+var connected_peripheral, connected = false;
+
+function initialisePeripheral(){
+	if(connected_peripheral){
+		connected_peripheral.on('disconnect', function(){
+			console.log('Disconnected from peripheral');
+		});
+
+		connected_peripheral.connect(function(err){
+			if(err){
+				connected = false;
+				console.log(chalk.red(err));
+			}else{
+				noble.stopScanning();
+				connected = true;
+				console.log('Connection established');
+			}
+		})
+
+	}
+}
+
+function disconnectPeripheral(){
+	if(connected_peripheral){
+		connected = false;
+		connected_peripheral.disconnect();
+		connected_peripheral = null;
+		noble.startScanning();
+	}
+}
+
+
 /**
 START MQTT SERVER
 **/
@@ -72,6 +104,7 @@ function get(url, response){
 	var splitUrl = url.split('/');
 
 	if(splitUrl.length == 2){
+		disconnectPeripheral();
 		console.log(chalk.blue('ALIVE'));
 		response.write('roger');
 		response.end();
@@ -79,7 +112,7 @@ function get(url, response){
 
 	//coap standard uri for important information on server
 	if(splitUrl.length > 2 && splitUrl[1] === '.well-known' && splitUrl[2] === "core"){
-
+		disconnectPeripheral();
 		console.log(chalk.cyan('WELL KNOWN REQUEST'));
 		console.log(splitUrl);
 		if(splitUrl.length==4){
@@ -96,68 +129,86 @@ function get(url, response){
 
 			var deviceId = splitUrl[1];
 
-			if(splitUrl[2] == "exp"){
-				console.log(chalk.cyan('Exploring device:' + deviceId));
-				//explore this device
-
-				if(discoveries[deviceId]){
-					//if(discoveries[deviceId].explored){
-					if(discoveries[deviceId].paths){
-						response.write(JSON.stringify(discoveries[deviceId].paths));
-						response.end();
-					}else{
-						getServicesSync(deviceId,response);
-					}
-				}else{
-					console.log(chalk.red('Error: Unknown peripheral'));
-					response.write('Unknown device id');
-					response.end();
-				}
+			if(!discoveries[deviceId]){
+				response.write('Unknown device id');
+				response.end();
 			}else{
-				//service interaction
-				var service = splitUrl[2];
-				/*
-				service will contain a UUID
-				interact with service/characteristic
-				- requires service validation
-				*/
 
-				var deviceJSON = discoveries[ deviceId ];
-				console.log(chalk.inverse('paths[service] = ' + JSON.stringify(deviceJSON.paths[service])));
-				if(deviceJSON && deviceJSON.paths[service]){
-
-
-					if(splitUrl.length == 5){// && (splitUrl[4] == 'read' || splitUrl[4] == 'sub')){
-						if(splitUrl[4] == 'read'){
-							console.log('read');
-							read(response,deviceJSON.peripheral,service,splitUrl[3]);
-						}else if(splitUrl[4] == 'sub'){
-							console.log('sub');
-							subscribe(deviceJSON,service,splitUrl[3],response);
-						}
-					} else if(deviceJSON.inRange){
-						console.log(chalk.inverse('Device in range'));
-						var argFour = splitUrl[3];
-						if(argFour == 'getChars'){
-							var keys = Object.keys(deviceJSON.paths[service]);
-							if(keys.length > 0){
-								response.write(deviceJSON.paths[service]);
-								response.end();
-							}else{
-								getCharacteristics(deviceId, service, response);
-							}
-
-						}
-					}else{
-						response.write("Device has gone out of range");
-						requestComplete(response,2);
-					}
-
-				}else{
-					response.write("service does not exist");
-					requestComplete(response, 1);
+				if(!connected_peripheral){
+					connected_peripheral = discoveries[deviceId].peripheral;
+				}else if(connected_peripheral !== discoveries[deviceId].peripheral){
+					disconnectPeripheral();
+					connected_peripheral = discoveries[deviceId].peripheral;
+					initialisePeripheral();
+				}
+				if(!connected){
+					initialisePeripheral();
 				}
 
+				if(splitUrl[2] == "exp"){
+					console.log(chalk.cyan('Exploring device:' + deviceId));
+					//explore this device
+
+					if(discoveries[deviceId]){
+						//if(discoveries[deviceId].explored){
+						if(discoveries[deviceId].paths){
+							response.write(JSON.stringify(discoveries[deviceId].paths));
+							response.end();
+						}else{
+							getServicesSync(deviceId,response);
+						}
+					}else{
+						console.log(chalk.red('Error: Unknown peripheral'));
+						response.write('Unknown device id');
+						response.end();
+					}
+				}else{
+					//service interaction
+					var service = splitUrl[2];
+
+					/*
+					service will contain a UUID
+					interact with service/characteristic
+					- requires service validation
+					*/
+
+					var deviceJSON = discoveries[ deviceId ];
+					console.log(chalk.inverse('paths[service] = ' + JSON.stringify(deviceJSON.paths[service])));
+					if(deviceJSON && deviceJSON.paths[service]){
+
+
+						if(splitUrl.length == 5){// && (splitUrl[4] == 'read' || splitUrl[4] == 'sub')){
+							if(splitUrl[4] == 'read'){
+								console.log('read');
+								read(response,service,splitUrl[3]);
+							}else if(splitUrl[4] == 'sub'){
+								console.log('sub');
+								subscribe(service,splitUrl[3],response);
+							}
+						} else if(deviceJSON.inRange){
+							console.log(chalk.inverse('Device in range'));
+							var argFour = splitUrl[3];
+							if(argFour == 'getChars'){
+								var keys = Object.keys(deviceJSON.paths[service]);
+								if(keys.length > 0){
+									response.write(deviceJSON.paths[service]);
+									response.end();
+								}else{
+									getCharacteristics(deviceId, service, response);
+								}
+
+							}
+						}else{
+							response.write("Device has gone out of range");
+							requestComplete(response,2);
+						}
+
+					}else{
+						response.write("service does not exist");
+						requestComplete(response, 1);
+					}
+
+				}
 			}
 		}else{
 			response.write("Invalid URI");
@@ -300,41 +351,35 @@ noble.on('discover', function(peripheral){
 });
 
 function getServicesSync(index,response){
-	noble.stopScanning();
-	var requestedPeripheral = discoveries[index].peripheral;
+
 	var url_paths={};
 
 	var retrieveServicesSync = new Promise(function(resolve,reject){
 		console.log('Synchronous service retrieval');
 
-		requestedPeripheral.on('disconnect',function(){
-			console.log('Disconnected in services sync');
-		});
-
-		requestedPeripheral.connect(function(err){
-			if(err){
-				console.log('connect err ' + err);
-				reject(err);
+		if(!connected){
+			connected_peripheral.connect(function(err){
+				if(err){
+					reject(err);
+				}else{
+					connected = true;
+				}
+			});
+		}
+		connected_peripheral.discoverServices([],function(error,services){
+			if(error){
+				reject(error);
 			}else{
-				console.log('connected to ' + discoveries[index].info);
-				requestedPeripheral.discoverServices([], function(error,services){
-					if(error){
-						reject(error);
-					}else{
-						for(var i = 0; i < services.length; i++){
-							console.log(chalk.bgGreen(services[i].uuid));
-
-							url_paths[services[i].uuid] = {};
-						}
-						discoveries[index].explored = true;
-						if((discoveries[index].paths) && Object.keys(discoveries[index].paths).length < Object.keys(url_paths).length){
-							discoveries[index].paths = url_paths;
-							resolve(JSON.stringify(url_paths));
-						}else{
-							resolve(JSON.stringify(discoveries[index].paths));
-						}
-					}
-				});
+				for(var i = 0; i < services.length; i++){
+					console.log(chalk.bgGreen(services[i].uuid));
+					url_paths[services[i].uuid] = {};
+				}
+				discoveries[index].explored = true;
+				if((discoveries[index].paths) && Object.keys(discoveries[index].paths).length < Object.keys(url_paths).length){
+					disoveries[index].paths = url_paths;
+					
+				}
+				resolve(JSON.stringify(discoveries[index].paths));
 			}
 		});
 		
@@ -345,79 +390,64 @@ function getServicesSync(index,response){
 	});
 	
 	retrieveServicesSync.then(function(result){
-
 		console.log('Successfully retrieved services sync');
-		requestedPeripheral.disconnect();
 		response.write(result);
 		response.end();
-		noble.startScanning();
-
 	});
 	retrieveServicesSync.catch(function(err){
-		
-		requestedPeripheral.disconnect();
 		response.write('Error: ' + err);
 		response.end();
-		noble.startScanning();
-
 	});
 
 }
 
 //response optional parameter
 function getServices(index,response){
-	noble.stopScanning();
-	var requestedPeripheral = discoveries[index].peripheral;
+
 	console.log(chalk.cyan('Fetching Services'));
 	var url_paths = {};
 
 	var serviceRetrieval = new Promise(function(resolve,reject){
-		console.log("Async service retrieval");
+		
+		if(!connected && connected_peripheral){
+			connected_peripheral.connect(function(err){
+				if(err){
+					reject(err);
+				}else{
+					connected = true;
+				}
+			});
+		}
 
-		requestedPeripheral.on('disconnect', function(){
-			console.log('Disconnected in service retrieval');
-		});
+		connected_peripheral.discoverServices([], function(error,services){
 
-		requestedPeripheral.connect(function(err){
+			var i = 0, paths = 0;
 
-			console.log(chalk.cyan('Connecting to peripheral'));
-			if(err){
-				console.log(chalk.red('Connect Error: ' + err));
-				reject(err);
-			}
-			else{
-				requestedPeripheral.discoverServices([], function(error,services){
+			async.whilst(
+				function(){ return i < services.length; },
+				function(callback){
+					var service = services[i];
 
-					var i = 0, paths = 0;
+					if(!url_paths[service.uuid]){
+						url_paths[service.uuid] = {};
+					}
+					i++;
 
-					async.whilst(
-						function(){ return i < services.length; },
-						function(serviceCallback){
-							var service = services[i];
-
-							if(!url_paths[service.uuid]){
-								url_paths[service.uuid] = {};
-							}
-							console.log(chalk.green('> ' + service.uuid));
-							i++;
-
-							serviceCallback(null,url_paths);
-						},
-						function(err,results){
-							if(err){
-								reject(err);
-							}else{
-								discoveries[index].explored = true;
-								if(Object.keys(url_paths).length > Object.keys(discoveries[index].paths).length){
-									discoveries[index].paths = url_paths;
-								}
-								resolve(JSON.stringify(discoveries[index].paths));
-							}
+					callback(null,url_paths);
+				},
+				function(serviceErr, results){
+					if(serviceErr){
+						reject(serviceErr);
+					}else{
+						discoveries[index].explored = true;
+						if(Object.keys(url_paths).length > Object.keys(discoveries[index].paths).length){
+							discoveries[index].paths = url_paths;
 						}
-					)
+						resolve(JSON.stringify(discoveries[index].paths));
+					}
+				}
+			);
 
-				});
-			}
 		});
 
 		setTimeout(reject('Timeout'), 60000); //timeout after 1 minute
@@ -425,115 +455,88 @@ function getServices(index,response){
 	});
 
 	serviceRetrieval.then(function(results){
-		
 		console.log('Successfully retrieved services');
-		requestedPeripheral.disconnect();
 		response.write(results);
 		response.end();
-		noble.startScanning();
-
 	});
 	serviceRetrieval.catch(function(error){
-		
-		requestedPeripheral.disconnect();
 		response.write('Error: ' + error);
 		response.end();
-		noble.startScanning();
-
 	});
 
 }
 
 function getCharacteristics(index, uuid, response){
-	noble.stopScanning();
-
-	var peripheral = discoveries[index].peripheral;
-
-	console.log(chalk.bgCyan('Getting ' + uuid + ' from ' + peripheral.advertisement.localName));
-
-
 	var charsRetrieval = new Promise(function(resolve,reject){
 
-		//console.log('starting @ '+new Date());
+		if(!connected){
+			console.log('Device not connected');
+			connected_peripheral.connect(function(err){
+				if(err){
+					reject(err);
+				}else{
+					connected = true;
+				}
+			});
+		}
 
-		peripheral.connect(function(connectErr){
+		connected_peripheral.discoverServices([uuid], function(servicesErr,services){
 
-			if(connectErr){
-				console.log(chalk.red('Error in get characteristics: ' + connectErr));
-				reject(connectErr);
+			if(servicesErr){
+				reject(servicesErr);
 			}else{
-				console.log(chalk.bgCyan('Connected in get characteristics'));
-				peripheral.discoverServices([uuid], function(servicesErr,services){
 
-					if(servicesErr){
-						console.log(chalk.red('Error discovering services: ' + servicesErr));
-						reject(servicesErr);
-					}else{
-						console.log('Services length: ' + services.length);
-						var results = {};
-						var i = 0;
-						async.whilst(
-							function(){ return i < services.length; },
-							function(callback){
-								var service = services[i];
-								service.discoverCharacteristics([],function(characteristicsErr,characteristics){
-									if(characteristicsErr){
-										callback(characteristicsErr);
-									}else{
-										for(var j = 0; j < characteristics.length; j++){
-											var thisChar = characteristics[j];
-											console.log(chalk.magenta(thisChar.uuid));
-											results[thisChar.uuid] = {
-												name: thisChar.name,
-												properties: thisChar.properties
-											};
-										}
-										i++;
-										callback(null,JSON.stringify(results));
-									}
-								});
-							},
-							function(err,res){
-								if(err){
-									reject(err);
-								}else{
-									resolve(res);
+				var results = {};
+				var i = 0;
+
+				async.whilst(
+					function(){ return i < services.length; },
+					function(callback){
+						var service = services[i];
+						service.discoverCharacteristics([], function(charErr, characteristics){
+
+							if(charErr){
+								callback(charErr);
+							}else{
+								for(var j = 0; j < characteristics.length; j++){
+									var c = characteristics[j];
+
+									results[c.uuid] = {
+										name: c.name,
+										properties: c.properties
+									};
 								}
+								i++;
+								callback(null,JSON.stringify(results));
 							}
-						);
-					}
 
-				});
+						});
+					},
+					function(error,results){
+						if(error){
+							reject(error);
+						}else{
+							resolve(results);
+						}
+					}
+				);
+
 			}
+
 		});
 
-		/*setTimeout(function(){
-			console.log('Timing out @ ' + new Date());
-			reject('Timeout');
-		}, 45000);*/
 	});
 
 	charsRetrieval.then(function(results){
 		console.log('Successfully retrieved characteristics');
-
-		peripheral.disconnect(function(e){
-			console.log('disconnected in characteristic retrieval');
-		});
 		discoveries[index].paths[uuid] = results;
 		response.write(results);
 		response.end();
-		noble.startScanning();
 	
 	});
 	charsRetrieval.catch(function(error){
-
-		peripheral.disconnect(function(e){
-			console.log('disconnected in characteristic retrieval');
-		});
 		response.write('Error: ' + error);
 		response.end();
-		noble.startScanning();
-
 	});
 	
 }
@@ -541,78 +544,62 @@ function getCharacteristics(index, uuid, response){
 /*
 read given characteristic
 */
-function read(response, peripheral, service, characteristic){
-	noble.stopScanning();
-	console.log('Reading characteristic ' + characteristic);
+function read(response, service, characteristic){
 
 	var readChar = new Promise(function(resolve,reject){
 
-		peripheral.on('disconnect',function(){
-			console.log('Disonnect in read');
-		});
-		console.log('Connecting in read...');
-		peripheral.connect(function(connErr){
+		if(!connected){
+			connected_peripheral.connect(function(error){
+				if(error){
+					reject(error);
+				}else{
+					connected = true;
+				}
+			});
+		}
 
-			if(connErr){
-			
-				console.log('Connection error in read: ' + connErr);
-				reject(connErr);
-			
+		connected_peripheral.discoverServices([service], function(serviceErr,services){
+
+			if(serviceErr){
+				reject(serviceErr);
 			}else{
+				var i = 0;
+				async.whilst(
+					function(){ return i < services.length; },
+					function(callback){
+						var service = services[i++];
 
-				peripheral.discoverServices([service],function(serviceErr,services){
+						service.discoverCharacteristics([characteristic], function(charErr,characteristics){
+							if(charErr){
+								callback(charErr);
+							}else{
 
-					if(serviceErr){
-						console.log('Service discovery error: ' + serviceErr);
-						reject(serviceErr);
-					}else{
-						
-						var i = 0;
-						async.whilst(
-							function(){ return i < services.length; },
-							function(callback){
-								var service = services[i++];
+								var result;
+								for(var j = 0; j < characteristics.length; j++){
+									var c = characteristics[j];
 
-								service.discoverCharacteristics([characteristic], function(charErr,characteristics){
-
-									if(charErr){
-										console.log(chalk.red('Characteristic discovery error: ' + charErr));
-										callback(charErr);
-									}else{
-
-										var j = 0;
-										async.whilst(
-											function(){ return j < characteristics.length; },
-											function(nested_callback){
-
-												var c = characteristics[j++];
-
-												var readValue = readData(c);
-												nested_callback(readValue);
-											},
-											function(readErr,readResults){
-												if(readErr){
-													console.log(chalk.red('Error in reading characteristic: '+readErr));
-													callback(readErr);
-												}else{
-													callback(null,readResults);
-												}
-											});
-
-									}
-
-								});
-							},
-							function(err,results){
-								if(err){
-									console.log(chalk.red('Error in reading characteristic: ' + err));
-									reject(err);
-								}else{
-									resolve(results);
+									c.read(function(err,data){
+										if(err){
+											reject(err);
+										}else{
+											var readData = { data: data.readInt16BE(0) };
+											console.log(chalk.blue('Data: ' + readData));
+											callback(null, JSON.stringify(readData));
+										}
+									});
 								}
-							});
+
+							}
+						});
+					},
+					function(err,res){
+						if(err){
+							reject(err);
+						}else{
+							resolve(res);
 						}
-				});
+					}
+				);
 			}
 
 		});
@@ -625,89 +612,64 @@ function read(response, peripheral, service, characteristic){
 	});
 
 	readChar.then(function(result){
-		
-		peripheral.disconnect();
 		console.log('Promise fulfilled: ' + result);
 		response.write(result);
+		console.log(response.payload);
 		response.end();
-		noble.startScanning();
-
 	}).catch(function(error){
-
-		console.log('Error: ' + error);
-
-		peripheral.disconnect();
 		response.write(error);
 		response.end();
-		noble.startScanning();
-
 	});
 
 }
 
-function readData(c){
-	c.read(function(readErr,data){
-		if(readErr){
-			return readErr;
-		}else{
-			return data.readInt16BE(0);
-		}
-	});
-}
-
-function readSync(response, peripheral, service, characteristic){
-	noble.stopScanning();
-	console.log('Synchronous Reading characteristic ' + characteristic);
-
+function readSync(response, service, characteristic){
 	var readVal;
 
 	var readPromise = new Promise(function(resolve, reject){
 
-		peripheral.on('disconnect', function(){
-			console.log('disconnected in readSync');
-		});
+		if(!connected){
+			connected_peripheral.connect(function(err){
+				if(err){
+					reject(err);
+				}else{
+					connected = true;
+				}
+			})
+		}
 
-		peripheral.connect(function(connErr){
-			
-			if(connErr){
-				console.log(chalk.red('Read Sync err: ' + connErr));
-				reject(connErr);
+		connected_peripheral.discoverServices([service], function(serviceErr,services){
+
+			if(serviceErr){
+				reject(serviceErr);
 			}else{
-				console.log('Connected in sync read');
-				peripheral.discoverServices([service], function(serviceErr,services){
 
-					if(serviceErr){
-						console.log(chalk.red('read sync err: ' + serviceErr));
-						reject(serviceErr);
-					}else{
+				for(var i = 0; i < services.length; i++){
 
-						for(var i = 0; i < services.length; i++){
+					var thisService = services[i];
+					thisService.discoverCharacteristics([characteristic], function(charErr, characteristics){
 
-							var thisService = services[i];
-							thisService.discoverCharacteristics([characteristic], function(charErr,characteristics){
+						if(charErr){
+							reject(charErr);
+						}else{
 
-								if(charErr){
-									console.log(chalk.red('Read sync err: ' + charErr));
-									reject(charErr);
-								}else{
+							for(var j = 0; j < characteristics.length; j++){
+								var c = characteristics[j];
 
-									for(var j = 0; j < characteristics.length; j++){
-										var c = characteristics[j];
-
-										console.log('Awaiting...');
-										resolve(readData(c));
-										
+								readVal = c.read(function(err,data){
+									if(err){
+										return err;
+									}else{
+										return data.readInt16BE(0);
 									}
-
-								}
-
-							});
-
+								});
+							}
+							resolve(readVal);
 						}
 
-					}
+					});
 
-				});
+				}
 
 			}
 
@@ -724,99 +686,69 @@ function readSync(response, peripheral, service, characteristic){
 	});
 
 	readPromise.then(function(result){
-
-		peripheral.disconnect();
 		response.write(result);
 		response.end();
-		noble.startScanning();
-
 	}).catch(function(error){
-
-		peripheral.disconnect();
 		response.write(error);
 		response.end();
-		noble.startScanning();
-
 	});
 }
 
-function subscribe(deviceJSON,service,char,response){
-	noble.stopScanning();
-	var peripheral = deviceJSON.peripheral;
-
+function subscribe(service,char,response){
 	var subPromise = new Promise(function(resolve,reject){
 
-		peripheral.on('disconnect',function(){
-			console.log('Disconnected in subscribe');
-		})
+		if(!connected){
+			connected_peripheral.connect(function(err){
+				if(err){
+					reject(err);
+				}else{
+					connected = true;
+				}
+			});
+		}
 
-		peripheral.connect(function(err){
-			if(err){
-				console.log('in subscribe - connection err: ' + err);
-				reject(err);
+		connected_peripheral.discoverServices([service],function(serviceErr,services){
+
+			if(serviceErr){
+				reject(serviceErr);
 			}else{
+				for(var s in services){
+					var thisService = services[s];
 
-				peripheral.discoverServices([service],function(serviceErr,services){
-					
-					if(serviceErr){
-						console.log('in subscribe - service err: ' + serviceErr);
-						reject(serviceErr);
-					}else{
+					thisService.discoverCharacteristics([char], function(charErr,chars){
+						if(charErr){
+							reject(charErr);
+						}else{
+							for(var c in chars){
 
-						for(var s in services){ //not async as there should only be one
-
-							var thisService = services[s];
-							thisService.discoverCharacteristics([char],function(charErr,chars){
-
-								if(charErr){
-									console.log('in subscribe - char err: ' + charErr);
-									reject(charErr);
-								}else{
-
-									for(var c in chars){ //not async as there should only be one
-
-										var thisChar = chars[c];
-										thisChar.subscribe(function(subscribeErr){
-											if(subscribeErr){
-												console.log('in subscribe - subscription err: ' + subscribeErr);
-												reject(subscribeErr);
-											}
-										});
-
-										//isNotification is deprecated - ignore it
-										thisChar.on('data',function(data,isNotification){
-
-											var thisTopic = discoveries_LUT[peripheral.id]+'/'+service+'/'+char;
-
-											var message = {
-												topic: thisTopic,
-												payload: data,
-												qos: 0,
-												retain: false
-											};
-
-											mqttServer.publish(message,function(){
-												console.log('Published data from subscription');
-											});
-
-										});
-
-										resolve('Subscription set up');
-
+								var thisChar = chars[c];
+								thisChar.subscribe(function(subscribeErr){
+									if(subscribeErr){
+										reject(subscribeErr);
 									}
+								});
 
-								}
+								//isNotification is deprecated
+								thisChar.on('data',function(data,isNotification){
+									var thisTopic = discoveries_LUT[connected_peripheral.id]+'/'+service+'/'+char;
 
-							});
+									var message = {
+										topic: thisTopic,
+										payload: data.readInt16BE(0),
+										qos: 0,
+										retain: false
+									};
 
+									mqttServer.publish(message,function(){
+										console.log(thisTopic + ': data published');
+									});
+								});
+								resolve('Initiated Subscription');
+							}
 						}
-
-					}
-
-				});
-
+					});
+				}
 			}
-
 
 		});
 
@@ -824,16 +756,12 @@ function subscribe(deviceJSON,service,char,response){
 
 	subPromise.then(function(results){
 		console.log('Subscribe: '+results);
-		peripheral.disconnect();
 		response.write(results);
 		response.end();
-		noble.startScanning();
 	}).catch(function(error){
 		console.log('Subscribe: '+error);
-		peripheral.disconnect();
 		response.write(error);
 		response.end();
-		noble.startScanning();
 	});
 
 }
