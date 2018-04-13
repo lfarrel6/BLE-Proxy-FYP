@@ -30,22 +30,18 @@ router.get('/:ip/observations',function(req,res){
 
 	coapReq.on('response',function(coapRes){
 
-		console.log("COAP RESPONSE: " + JSON.stringify(coapRes));
+		//console.log("COAP RESPONSE: " + JSON.stringify(coapRes));
 
-		console.log('MESSAGE CODE: ' + coapRes.code);
+		//console.log('MESSAGE CODE: ' + coapRes.code);
 
 		coapRes.setEncoding('utf8');
 
-		console.log("PAYLOAD: " + coapRes.payload);
 		if(coapRes.payload == "N/A"){
 			res.write("N/A");
 			res.end();
 		}else{
 
 			coapRes.on('data',function(chunk){
-
-				console.log('CHUNK TYPE: ' + chunk.constructor.name);
-
 				res.write(chunk);
 			});
 		
@@ -150,12 +146,12 @@ router.get('/:ip/:device/:service/:char/sub/msg',function(req,res){
 	var topic = device+'/'+service+'/'+char;
 
 	if(clientManager.hasClient(ipAddr) && clientManager.isSubscribed(ipAddr,topic)){
-		res.write(clientManager.getMessages(ipAddr,topic));
+		res.write(JSON.stringify(clientManager.getMessages(ipAddr,topic)));
 	}else{
 		res.write('Subscription not found');
 	}
 	res.end();
-}
+});
 
 router.get('/:ip/:device/exp',function(req,res){
 	var ipAddr = req.params.ip;

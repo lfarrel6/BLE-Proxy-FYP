@@ -142,7 +142,8 @@
   					,10000);
   				}else{
   					//to be changed
-  					document.getElementById('characteristic-data-display').innerHTML = data.data;
+
+  					document.getElementById('characteristic-data-display').innerHTML = JSON.parse(data).data;
   				}
   			});
   		}

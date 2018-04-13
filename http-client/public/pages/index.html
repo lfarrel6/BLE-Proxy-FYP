@@ -98,7 +98,7 @@
 <script type="text/javascript">
 
 $(document).ready(function(){
-	firebase.auth().onAuthStateChanged(function(user){
+	/*firebase.auth().onAuthStateChanged(function(user){
 		if(user){
 			document.getElementById('auth-container').style.display = 'none';
 			console.log(user.uid + '(' + user.email + ') signed in');
@@ -110,10 +110,10 @@ $(document).ready(function(){
 		}else{
 			document.getElementById('auth-container').style.display = 'block';
 		}
-	});
+	});*/
 });
 
-function signIn(){
+/*function signIn(){
 	var email = document.getElementById('username').value;
 	console.log(email.constructor.name);
 
@@ -164,7 +164,7 @@ function createUser(email, password){
 	firebase.auth().createUserWithEmailAndPassword(email,password).catch(function(error){
 		console.log(error.code + ': ' + error.message);
 	});
-}
+}*/
 
 function ipSubmit(){
 	var enteredIp = document.getElementById('ip-entry').value;
@@ -179,7 +179,9 @@ function ipSubmit(){
 		//intiate coap request to see if proxy exists at this ip
 		$.get(enteredIp + '/alive',null,function(data){
 			//if proxy exists, add proxy to user in database and continue to dashboard
-			var proxyRef = firebase.database().ref(firebase.auth().currentUser.uid+'/servers/'+enteredIp);
+			location.href = location.href + 'dashboard/' + enteredIp;
+			
+			/*var proxyRef = firebase.database().ref(firebase.auth().currentUser.uid+'/servers/'+enteredIp);
 			proxyRef.once('value',function(snapshot){
 				if(snapshot.exists()){
 					console.log('Proxy already associated to user');
@@ -188,7 +190,7 @@ function ipSubmit(){
 					console.log('Proxy added to user acc');
 				}
 				location.href = location.href + 'dashboard/' + enteredIp;
-			});
+			});*/
 		});
 	}else{
 		console.log('Invalid Entry. IPv4 or IPv6 expected.');

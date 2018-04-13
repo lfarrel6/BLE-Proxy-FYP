@@ -19,7 +19,11 @@ function initialisePeripheral(){
 	if(connected_peripheral){
 		connected_peripheral.on('disconnect', function(){
 			console.log('Disconnected from peripheral');
+			console.log(chalk.inverse('connected: ' + connected));
+			noble.startScanning();
 		});
+
+		//console.log('Initialising connection with: ' + JSON.stringify(connected_peripheral));
 
 		connected_peripheral.connect(function(err){
 			if(err){
@@ -135,13 +139,16 @@ function get(url, response){
 			}else{
 
 				if(!connected_peripheral){
+					console.log('No peripheral connected');
 					connected_peripheral = discoveries[deviceId].peripheral;
 				}else if(connected_peripheral !== discoveries[deviceId].peripheral){
+					console.log('Switching peripheral');
 					disconnectPeripheral();
 					connected_peripheral = discoveries[deviceId].peripheral;
 					initialisePeripheral();
 				}
 				if(!connected){
+					console.log('Connecting to peripheral');
 					initialisePeripheral();
 				}
 
@@ -227,6 +234,7 @@ function wellKnown(res,index=null){
 		i = index;
 	}
 	var responseLength = 0;
+	var getDiscoveries;
 	var keys = Object.keys(discoveries_LUT);
 	
 	var getDiscoveries = new Promise(function(resolve,reject){
@@ -252,9 +260,10 @@ function wellKnown(res,index=null){
 			}
 		);
 		//if function doesn't complete in 15 seconds, force timeout
-		setTimeout(reject('Timeout'),10000);
+		getDiscoveries = setTimeout(reject('Timeout'),10000);
 	});
 	getDiscoveries.then(function(result){
+		clearTimeout(getDiscoveries);
 		res.write(result);
 		res.end();
 	}).catch(function(err){
@@ -354,6 +363,8 @@ function getServicesSync(index,response){
 
 	var url_paths={};
 
+	var serviceTimeout;
+
 	var retrieveServicesSync = new Promise(function(resolve,reject){
 		console.log('Synchronous service retrieval');
 
@@ -384,12 +395,15 @@ function getServicesSync(index,response){
 		});
 		
 		//call timeout after 30 seconds
-		setTimeout(function(){
+		serviceTimeout = setTimeout(function(){
 			reject('Timeout');
 		}, 30000);
 	});
 	
 	retrieveServicesSync.then(function(result){
+		if(serviceTimeout){
+			clearTimeout(serviceTimeout);
+		}
 		console.log('Successfully retrieved services sync');
 		response.write(result);
 		response.end();
@@ -406,7 +420,7 @@ function getServices(index,response){
 
 	console.log(chalk.cyan('Fetching Services'));
 	var url_paths = {};
-
+	var serviceTimeout;
 	var serviceRetrieval = new Promise(function(resolve,reject){
 		
 		if(!connected && connected_peripheral){
@@ -450,11 +464,14 @@ function getServices(index,response){
 
 		});
 
-		setTimeout(reject('Timeout'), 60000); //timeout after 1 minute
+		serviceTimeout = setTimeout(reject('Timeout'), 60000); //timeout after 1 minute
 
 	});
 
 	serviceRetrieval.then(function(results){
+		if(serviceTimeout){
+			clearTimeout(serviceTimeout);
+		}
 		console.log('Successfully retrieved services');
 		response.write(results);
 		response.end();
@@ -546,6 +563,8 @@ read given characteristic
 */
 function read(response, service, characteristic){
 
+	var readTimeout;
+
 	var readChar = new Promise(function(resolve,reject){
 
 		if(!connected){
@@ -604,7 +623,7 @@ function read(response, service, characteristic){
 
 		});
 
-		setTimeout(function(){
+		readTimeout = setTimeout(function(){
 			console.log('Timeout called');
 			reject('Timeout');
 		}, 45000);
@@ -612,9 +631,11 @@ function read(response, service, characteristic){
 	});
 
 	readChar.then(function(result){
+		if(readTimeout){
+			clearTimeout(readTimeout);
+		}
 		console.log('Promise fulfilled: ' + result);
 		response.write(result);
-		console.log(response.payload);
 		response.end();
 	}).catch(function(error){
 		response.write(error);
@@ -625,7 +646,7 @@ function read(response, service, characteristic){
 
 function readSync(response, service, characteristic){
 	var readVal;
-
+	var readTimeout;
 	var readPromise = new Promise(function(resolve, reject){
 
 		if(!connected){
@@ -675,7 +696,7 @@ function readSync(response, service, characteristic){
 
 		});
 
-		setTimeout(function(){
+		readTimeout = setTimeout(function(){
 			console.log('timeout');
 			response.write('timeout');
 			response.end();
@@ -686,6 +707,7 @@ function readSync(response, service, characteristic){
 	});
 
 	readPromise.then(function(result){
+		clearTimeout(readTimeout);
 		response.write(result);
 		response.end();
 	}).catch(function(error){

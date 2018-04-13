@@ -24,11 +24,11 @@ MQTTManager.prototype.createClient = function(addr,port=1883){
 	self.clients[addr].on('connect',function(){
 		console.log('Client connected to ' + addr + ' on ' + port);
 		self.emit('connect');
-		self.clients[addr].on('message',function(topic,message){
-			console.log('New Message! ' + topic.toString() + ': ' + message.toString());
-			self.emit('message',addr,topic,message);
-			self.clients[addr].subscriptions[topic].push(message);
-		});
+	});
+	self.clients[addr].on('message',function(topic,message,p){
+		console.log('New Message! ' + topic.toString() + ': ' + message.toString());
+		self.emit('message',addr,topic,message);
+		self.clients[addr].subscriptions[topic].push(message);
 	});
 }
 
@@ -69,7 +69,7 @@ MQTTManager.prototype.isSubscribed = function(addr,topic){
 
 MQTTManager.prototype.getMessages = function(addr,topic){
 	var self = this;
-	return self.clients[addr].subscriptions[topic];
+	return {messages: self.clients[addr].subscriptions[topic]};
 }
 
 module.exports = MQTTManager;
