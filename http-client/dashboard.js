@@ -2,9 +2,8 @@ var express = require('express');
 var router = express.Router();
 var coap = require('coap');
 var path = require('path');
-var MQTTManager = require('./MQTTManager');
-
-var clientManager = new MQTTManager();
+var fs = require('fs');
+var websocketStream = require('websocket-stream/stream');
 
 router.get('/:ip', function(req,res){
 	res.sendFile(path.join(__dirname, '/public/pages/dash.html'));
@@ -29,10 +28,6 @@ router.get('/:ip/observations',function(req,res){
 	var responseValue;
 
 	coapReq.on('response',function(coapRes){
-
-		//console.log("COAP RESPONSE: " + JSON.stringify(coapRes));
-
-		//console.log('MESSAGE CODE: ' + coapRes.code);
 
 		coapRes.setEncoding('utf8');
 
@@ -86,71 +81,43 @@ router.get('/:ip/:device/:service/:char/read',function(req,res){
 
 });
 
-router.get('/:ip/:device/:service/:char/sub',function(req,res){
+router.ws('/:ip/:device/:service/:char/sub',function(ws,req){
+	console.log('Websocket connection received to sub');
 	var ipAddr = req.params.ip;
 	var deviceID = req.params.device;
 	var service = req.params.service;
 	var characteristic = req.params.char;
 
-	console.log('subbing');
 
-	if(!clientManager.hasClient(ipAddr)){
-		clientManager.createClient(ipAddr);
-		console.log('client created');
-		clientManager.on('connect',function(){
-			console.log(' >>> connected')
-		});
-
-		clientManager.on('message',function(addr,topic,message){
-			console.log(addr + ' ' + topic + ' says ' + message);
-		});
-
-		clientManager.on('error',function(e){
-			console.log(e);
-		})
-	}
-
-	var coapUrl = 'coap://'+ipAddr+':5683/'+deviceID+'/'+service+'/'+characteristic+'/sub';
-	var coapReq = coap.request(coapUrl);
-
-	var result = '';
+	var coapReqPath = deviceID+'/'+service+'/'+characteristic;
+	var coapReq = coap.request({
+		host: ipAddr,
+		pathname: coapReqPath+'/sub',
+		observe: true
+	});
 
 	coapReq.on('response', function(coapRes){
 
-		coapReq.setEncoding('utf8');
+		console.log('Streaming data');
 
-		coapRes.on('data',function(chunk){
-			res.write(chunk);
-		});
+		ws.on('close',function(){
+			console.log('Websocket closed');
+			return;
+		})
 
-		coapRes.on('end',function(){
-			var topic = deviceID+'/'+service+'/'+characteristic;
-			clientManager.subscribe(ipAddr,topic);
-			clientManager.on('subscribe',function(){
-				console.log('subscribed');
-				res.end();
-			});
+		coapRes.on('data', function(data){
+			console.log(data.toString());
+			try{
+				ws.send(data.toString());
+			}catch(e){
+				console.log(e);
+				return;
+			}
 		});
 
 	});
 	coapReq.end();
 
-});
-
-router.get('/:ip/:device/:service/:char/sub/msg',function(req,res){
-	var ipAddr = req.params.ip;
-	var device = req.params.device;
-	var service = req.params.service;
-	var char = req.params.char;
-
-	var topic = device+'/'+service+'/'+char;
-
-	if(clientManager.hasClient(ipAddr) && clientManager.isSubscribed(ipAddr,topic)){
-		res.write(JSON.stringify(clientManager.getMessages(ipAddr,topic)));
-	}else{
-		res.write('Subscription not found');
-	}
-	res.end();
 });
 
 router.get('/:ip/:device/exp',function(req,res){

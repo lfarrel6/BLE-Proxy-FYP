@@ -2,7 +2,6 @@ var noble                      = require('noble')
   , coap                       = require('coap')
   , async                      = require('async')
   , chalk                      = require('chalk')
-  , sizeof                     = require('object-sizeof')
   , server                     = coap.createServer()
   , discoveries                = []
   , discoveries_LUT            = {}   //To allow for more simple indexing of peripherals using a lut to relate id's to indexes 
@@ -49,49 +48,15 @@ function disconnectPeripheral(){
 }
 
 
-/**
-START MQTT SERVER
-**/
-
-var mosca = require('mosca');
-
-var ascoltatore = config.mqttBackend;
-
-var settings = {
-  port: config.mqttPort,
-  backend: ascoltatore
-};
-
-var mqttServer = new mosca.Server(settings);
-
-mqttServer.on('clientConnected', function(client) {
-    console.log(chalk.inverse('client connected', client.id));
-});
-
-// fired when a message is received
-mqttServer.on('published', function(packet, client) {
-  console.log('Published', packet.payload);
-});
-
-mqttServer.on('ready', setup);
-
-// fired when the mqtt server is ready
-function setup() {
-  console.log('Mosca server is up and running');
-}
-
-/**
-END MQTT SERVER SET UP
-**/
-
-
 server.on('request', function(req, res){
 	console.log(chalk.green(req.method + ' request'));
 
 	switch(req.method){
 		case 'GET':
 			console.log(chalk.cyan('GET REQUEST RECEIVED'));
-			get(req.url, res);
+			if(req.headers['Observe']!==0)
+				return get(req.url, res);
+			get(req.url,res,true);
 			//console.log(chalk.cyan('OUTGOING RES PAYLOAD: ' + res.payload));
 			break;
 		//case    'PUT':
@@ -104,7 +69,7 @@ server.on('request', function(req, res){
 	}
 });
 
-function get(url, response){
+function get(url, response, obs=false){
 	var splitUrl = url.split('/');
 
 	if(splitUrl.length == 2){
@@ -190,7 +155,11 @@ function get(url, response){
 								read(response,service,splitUrl[3]);
 							}else if(splitUrl[4] == 'sub'){
 								console.log('sub');
-								subscribe(service,splitUrl[3],response);
+								if(obs){
+									testSub(service,splitUrl[3],response);
+								}else{
+									subscribe(service,splitUrl[3],response);
+								}
 							}
 						} else if(deviceJSON.inRange){
 							console.log(chalk.inverse('Device in range'));
@@ -714,6 +683,53 @@ function readSync(response, service, characteristic){
 		response.write(error);
 		response.end();
 	});
+}
+
+function testSub(service,char,response){
+	if(!connected){
+		connected_peripheral.connect(function(err){
+			if(err){
+				response.write(err);
+				response.end();
+			}else{
+				connected = true;
+			}
+		});
+	}
+
+	connected_peripheral.discoverServices([service],function(serviceErr,services){
+		if(serviceErr){
+			response.write(serviceErr);
+			response.end();
+		}else{
+			var s = services[0];
+			s.discoverCharacteristics([char],function(charErr,chars){
+				if(charErr){
+					response.write(charErr);
+					response.end();
+				}else{
+					var c = chars[0];
+					c.subscribe(function(subErr){
+						if(subErr){
+							response.write(subErr)
+							response.end();
+						}
+					});
+
+					c.on('data',function(data,isNotification){
+
+						var jsonOut = {
+							time: new Date(),
+							value: data.readInt16BE(0)
+						};
+
+						response.write(JSON.stringify(jsonOut));
+					});
+
+				}
+			});
+		}
+	})
 }
 
 function subscribe(service,char,response){

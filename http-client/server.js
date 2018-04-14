@@ -3,6 +3,7 @@ var express = require('express');
 var app = express();
 var cookieParser = require('cookie-parser');
 var coap = require('coap');
+var expressWs = require('express-ws')(app);
 var dashboard = require('./dashboard.js')
 
 app.use(cookieParser());

@@ -7,6 +7,7 @@
 	<link rel="stylesheet" type="text/css" href="/scripts/dashboard.css">
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 	<link rel="icon" href="/assets/favicon.png">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js"></script>
 </head>
 <body>
 
@@ -16,37 +17,37 @@
 		<h1 id='dash-title'></h1>
 	</div>
 
-	<div id='characteristic-popup'>
-		<div id='characteristic-interface-wrapper'>
-			<span id='close-characteristic' onclick="closePopUp()">X</span>
-			<div id='characteristic-interface'>
-				<h3 id='characteristic-interface-heading'></h3>
-				<div id='characteristic-interaction-panel'>
-					<ul id='characteristic-btn-list' class='btn-list'>
-					</ul>
-				</div>
-				<h3 id='characteristic-data-display'></h3>
-			</div>
-		</div>
-	</div>
-
 	<div class="dash-data-window two-col">
 		<img src="/assets/loading.gif" alt="loading" id="loading-gif">
 		<div class="serv-disp two-col-left">
-			<h3>Services</h3>
 			<ul id="services">
 			</ul>
 		</div>
 		<div class="chars-disp two-col-right">
-			<h3 id='selected-service'></h3>
 			<ul id="characteristics">
 			</ul>
 		</div>
 	</div>
 
+	<div id='characteristic-interface'>
+		<h3 id='characteristic-interface-heading'></h3>
+		<div id='characteristic-interaction-panel'>
+			<ul id='characteristic-btn-list' class='btn-list'>
+			</ul>
+		</div>
+		<div id='characteristic-data-panel'>
+		</div>
+	</div>
+	<div id='chart-holder'>
+		<canvas id='data-chart' width="1400" height="2100"></canvas>
+	</div>
+
 	<script type="text/javascript">
 
 		var chars = {};
+		var subData = [];
+		var subTimes = [];
+		var myLineChart;
 
 		function getCook(cookiename){
   			// Get name followed by anything except a semicolon
@@ -82,33 +83,49 @@
 
 						document.getElementById('characteristic-interface-heading').innerHTML = $('#'+characteristic).text();
 
-						//render pop up interface
-						document.getElementById('characteristic-popup').style.display = 'block';
-
 						var btnList = document.getElementById('characteristic-btn-list');
-						for(var btnChildI = 0; btnChildI < btnList.children.length; btnChildI++){
-							console.log(btnChildI);
-							btnList.removeChild(btnList.children[btnChildI]);
+						while(btnList.firstChild){
+							btnList.removeChild(btnList.firstChild);
 						}
 
 						for(var prop in characteristics[characteristic].properties){
 							var listElem = document.createElement('li');
-							listElem.setAttribute('id',prop);
+							var property = characteristics[characteristic].properties[prop];
+							listElem.setAttribute('id',property);
 
 							btnList.appendChild(listElem);
 
 							var interactionBtn = document.createElement('button');
 							interactionBtn.className='dashboard-buttons active';
 
-							interactionBtn.innerHTML = characteristics[characteristic].properties[prop];
+							if(property == 'notify' || property == 'indicate')
+								interactionBtn.innerHTML = 'subscribe';	
+							else
+								interactionBtn.innerHTML = property;
 
 							listElem.appendChild(interactionBtn);
 
-							$('#'+prop).click(function(){
-
+							$('#'+property).click(function(){
+								console.log($(this).prop('id'));
+								if($(this).prop('id') == 'notify' || $(this).prop('id') == 'indicate'){
+									if($(this).text() == 'subscribe'){
+										//unsub
+										console.log('unsub');
+										document.getElementById($(this).prop('id')).firstChild.innerHTML = 'unsubscribe';
+									}else{
+										//sub
+										console.log('sub');
+										document.getElementById($(this).prop('id')).firstChild.innerHTML = 'subscribe';
+									}
+								}
 								//run request
 								console.log($(this).text() + ' ' + characteristic);
-								var service = document.getElementById('selected-service').innerHTML;
+								var service; // = document.getElementById('selected-service').innerHTML;
+								for(var i in chars){
+									if(chars[i][characteristic]){
+										service = i;
+									}
+								}
 								driveInteraction(service,characteristic,$(this).text());
 
 							});
@@ -126,24 +143,102 @@
   			if(requestType=='read'){
   				url+='read';
   			}else if(requestType=='notify'||requestType=='indicate'){
-  				url+='sub';
   				sub = true;
   			}else if(requestType=='write'||requestType=='writeWithoutResponse'){
   				url+='write';
   			}
-  			$.get(url,null,function(data){
-  				console.log('Response: ' + data);
-  				if(sub){
-  					setInterval(
-  						function(){
-  							console.log('Poll');
-  							getMessages(url+'/msg');
-  						}
-  					,10000);
-  				}else{
-  					//to be changed
 
-  					document.getElementById('characteristic-data-display').innerHTML = JSON.parse(data).data;
+  			var dataDisplayArea = $('#characteristic-data-panel');
+			if(dataDisplayArea.firstChild){
+				if(dataDisplayArea.firstChild.tagName == 'h3' && sub){
+					while(dataDisplayArea.firstChild)
+						dataDisplayArea.removeChild(dataDisplayArea.firstChild);
+				}else if(dataDisplayArea.firstChild.tagName == 'chart' && !sub){
+					while(dataDisplayArea.firstChild)
+						dataDisplayArea.removeChild(dataDisplayArea.firstChild);
+				}
+			}
+
+
+  			if(sub){
+
+  				var splitURL = url.split('/');
+  				var pathws = 'ws://';
+  				//starting at index two ignores leading protocol
+  				for(var i = 2; i < splitURL.length; i++){
+  					pathws += splitURL[i] +(i+1==splitURL.length?'':'/');
+  				}
+  				pathws+='sub';
+  				var subSocket = new WebSocket(pathws);
+  				var noDataTimeout;
+
+  				subSocket.onerror = function(e){
+  					console.log(e);
+  				}
+  				subSocket.onclose = function(){
+  					console.log('Socket closed');
+  				}
+
+  				subSocket.onopen = function(event){
+  					console.log('Websocket opened at ' + pathws);
+  					subSocket.send('Testing');
+  				}
+  				subSocket.onmessage = function(event){
+  					if(noDataTimeout)
+  						clearTimeout(noDataTimeout);
+  					
+  					var jsonify = JSON.parse(event.data);
+  					console.log('Received: ' + JSON.stringify(jsonify));
+  					subData.push(jsonify.value);
+  					subTimes.push(jsonify.time);
+
+  					myLineChart.data.labels.push(jsonify.time);
+  					myLineChart.data.datasets.forEach((dataset) => {
+  						dataset.data.push(jsonify.value);
+  					});
+  					myLineChart.update();
+
+  					noDataTimeout = setTimeout(function(){
+  						subSocket.close();
+  					}, 30000);
+  				}
+  			}else{
+  				$.get(url,null,function(data){
+  					//to be changed
+  					var dataDisp = document.createElement('h3');
+  					dataDisp.setAttribute('id','received-data-display');
+  					if(data!=='Timeout'){
+  						dataDisp.innerHTML = JSON.parse(data).data;
+  					}
+  					document.getElementById('characteristic-data-panel').appendChild(dataDisp);
+  				});
+  			}
+  		}
+
+  		function makeChart(){
+  			var chart = $('#data-chart');
+  			myLineChart = new Chart(chart,{
+	  			"type": "line",
+	  			"data": {
+	  				"labels": subTimes,
+	  				"datasets": [{
+	  					"label":"Subscription Data",
+	  					"data":subData,
+	  					"fill": false,
+  						"borderColor": "#ff1111",
+  						"backgroundColor": "#eeeeee",
+  						"lineTension": 0.2
+  					}]
+  				},
+  				"options": {
+  					"animation": false,
+  					"scales": {
+  						"yAxes": [{
+  							"ticks": {
+  								"beginAtZero": true
+  							}
+  						}]
+  					}
   				}
   			});
   		}
@@ -154,12 +249,11 @@
   			});
   		}
 
-  		function closePopUp(){
-  			$('#characteristic-popup').hide();
-  		}
-
-
 		$(document).ready(function(){
+
+
+			makeChart();
+
 
 			document.getElementById('dash-title').innerHTML = getCook('device');
 
@@ -209,13 +303,13 @@
 							var service = $(this).prop('id');
 							console.log('chars: ' + JSON.stringify(chars));
 
-							if(service != document.getElementById('selected-service').innerHTML){
+							//if(service != document.getElementById('selected-service').innerHTML){
 
 								if(chars[service]){
 									displayChars(chars[service]);
 								}else{
 									$.get(location.href+'/'+service+'/getChars',null,function(characteristics){
-										document.getElementById('selected-service').innerHTML = service;
+										//document.getElementById('selected-service').innerHTML = service;
 										console.log('RESPONSE: '+JSON.stringify(characteristics));
 										var charJSON;
 										try{
@@ -234,7 +328,7 @@
 										}
 									});
 								}
-							}
+							//}
 						});
 					}
 				}
