@@ -719,7 +719,7 @@ function testSub(service,char,response){
 					c.on('data',function(data,isNotification){
 
 						var jsonOut = {
-							time: new Date(),
+							time: Date.now(),
 							value: data.readInt16BE(0)
 						};
 

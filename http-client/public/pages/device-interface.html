@@ -46,7 +46,8 @@
 
 		var chars = {};
 		var subData = [];
-		var subTimes = [];
+		//var subTimes = [];
+		var subSocket;
 		var myLineChart;
 
 		function getCook(cookiename){
@@ -106,6 +107,8 @@
 							listElem.appendChild(interactionBtn);
 
 							$('#'+property).click(function(){
+								var action = $(this).text();
+								console.log(action);
 								console.log($(this).prop('id'));
 								if($(this).prop('id') == 'notify' || $(this).prop('id') == 'indicate'){
 									if($(this).text() == 'subscribe'){
@@ -119,14 +122,14 @@
 									}
 								}
 								//run request
-								console.log($(this).text() + ' ' + characteristic);
-								var service; // = document.getElementById('selected-service').innerHTML;
+								console.log(action + ' ' + characteristic);
+								var service;
 								for(var i in chars){
 									if(chars[i][characteristic]){
 										service = i;
 									}
 								}
-								driveInteraction(service,characteristic,$(this).text());
+								driveInteraction(service,characteristic,action);
 
 							});
 
@@ -142,8 +145,11 @@
   			var sub = false;
   			if(requestType=='read'){
   				url+='read';
-  			}else if(requestType=='notify'||requestType=='indicate'){
+  			}else if(requestType=='subscribe'){
   				sub = true;
+  			}else if(requestType=='unsubscribe'){
+  				subSocket.close();
+  				return;
   			}else if(requestType=='write'||requestType=='writeWithoutResponse'){
   				url+='write';
   			}
@@ -169,7 +175,7 @@
   					pathws += splitURL[i] +(i+1==splitURL.length?'':'/');
   				}
   				pathws+='sub';
-  				var subSocket = new WebSocket(pathws);
+  				subSocket = new WebSocket(pathws);
   				var noDataTimeout;
 
   				subSocket.onerror = function(e){
@@ -189,12 +195,12 @@
   					
   					var jsonify = JSON.parse(event.data);
   					console.log('Received: ' + JSON.stringify(jsonify));
-  					subData.push(jsonify.value);
-  					subTimes.push(jsonify.time);
+  					subData.push({x: jsonify.time, y: jsonify.value});
+  					//subTimes.push(jsonify.time);
 
   					myLineChart.data.labels.push(jsonify.time);
   					myLineChart.data.datasets.forEach((dataset) => {
-  						dataset.data.push(jsonify.value);
+  						dataset.data.push({x: jsonify.time, y: jsonify.value});
   					});
   					myLineChart.update();
 
@@ -220,7 +226,7 @@
   			myLineChart = new Chart(chart,{
 	  			"type": "line",
 	  			"data": {
-	  				"labels": subTimes,
+	  				//"labels": subTimes,
 	  				"datasets": [{
 	  					"label":"Subscription Data",
 	  					"data":subData,

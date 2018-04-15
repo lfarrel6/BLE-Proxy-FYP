@@ -87,6 +87,7 @@ router.ws('/:ip/:device/:service/:char/sub',function(ws,req){
 	var deviceID = req.params.device;
 	var service = req.params.service;
 	var characteristic = req.params.char;
+	var streaming = true;
 
 
 	var coapReqPath = deviceID+'/'+service+'/'+characteristic;
@@ -101,6 +102,7 @@ router.ws('/:ip/:device/:service/:char/sub',function(ws,req){
 		console.log('Streaming data');
 
 		ws.on('close',function(){
+			streaming = false;
 			console.log('Websocket closed');
 			return;
 		})
@@ -108,7 +110,8 @@ router.ws('/:ip/:device/:service/:char/sub',function(ws,req){
 		coapRes.on('data', function(data){
 			console.log(data.toString());
 			try{
-				ws.send(data.toString());
+				if(streaming)
+					ws.send(data.toString());
 			}catch(e){
 				console.log(e);
 				return;
