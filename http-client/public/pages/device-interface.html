@@ -211,12 +211,17 @@
   			}else{
   				$.get(url,null,function(data){
   					//to be changed
-  					var dataDisp = document.createElement('h3');
-  					dataDisp.setAttribute('id','received-data-display');
-  					if(data!=='Timeout'){
-  						dataDisp.innerHTML = JSON.parse(data).data;
+  					if(document.getElementById('received-data-display')){
+  						document.getElementById('received-data-display').innerHTML = (data!=='Timeout'?JSON.parse(data).data:'Timeout Error');
+  					}else{
+
+	  					var dataDisp = document.createElement('h3');
+	  					dataDisp.setAttribute('id','received-data-display');
+	  					if(data!=='Timeout'){
+	  						dataDisp.innerHTML = JSON.parse(data).data;
+	  					}
+	  					document.getElementById('characteristic-data-panel').appendChild(dataDisp);
   					}
-  					document.getElementById('characteristic-data-panel').appendChild(dataDisp);
   				});
   			}
   		}

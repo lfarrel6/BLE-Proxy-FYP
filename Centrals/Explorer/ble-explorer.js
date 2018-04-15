@@ -12,7 +12,145 @@ var noble                      = require('noble')
   , reverse_chars_lut          = require('./assets/reversed-characteristics-lut.json')
   , config                     = require('./assets/config.json');
 
+var DeviceManager = require('./assets/deviceManager');
+var manager = new DeviceManager();
+
 var connected_peripheral, connected = false;
+
+/* Incoming reqs
+URI                           | PARAM LENGTH | OBSERVE
+------------------------------|--------------|---------
+/alive                        |      1       |    N
+/.well-known/core 			  |      2       |    Y/N
+/:deviceID                    |      1       |    N
+/:deviceID/exp                |      2       |    N
+/:deviceID/:service/getChars  |      3       |    N
+/:deviceID/:service/:char/read|      4       |    N
+/:deviceID/:service/:char/sub |      4       |    Y
+*/
+
+function reqParser(url,response,obs=false){
+	var splitUrl = url.substr(1).split('/');
+	switch(splitUrl.length){
+		case 1:
+			console.log(url + ' at length 1');
+			/*
+			SERVER PINGS
+			*/
+			if(splitUrl[0] == 'alive'){
+				console.log(chalk.green('> Alive'));
+				return alive(response);
+			}else{
+				/*
+				CONNECT REQUESTS
+				*/
+				console.log(chalk.green('> Connect'));
+				var deviceId = splitUrl[0];
+				deviceConnect(response,deviceId);
+				return;
+			}
+			break;
+		case 2:
+			/*
+			WELL KNOWN
+			*/
+			console.log(url + ' at length 2');
+			if(splitUrl[0] == '.well-known' && splitUrl[1] == 'core'){
+				console.log(chalk.green('> Well known'));
+				if(obs){
+					wellKnownObs(response);
+				}else{
+					wellKnown(response);
+				}
+			/*
+			GET SERVICES
+			*/
+			}else if(splitUrl[1] == 'exp'){
+				console.log(chalk.green('> Get services'));
+				var deviceId = splitUrl[0];
+				verifyDevice(deviceId);
+				var device = manager.getDevice(deviceId);
+				if(device.paths){
+					response.write(JSON.stringify(device.paths));
+					response.end();
+				}else{
+					getServices(response);
+				}
+			}else{
+				response.write('Unknown Request');
+				response.end();
+			}
+			break;
+		case 3:
+			var deviceId = splitUrl[0];
+			verifyDevice(deviceId);
+			var device = manager.getDevice(deviceId);
+			var service = splitUrl[1];
+			/*
+			GET CHARACTERISTICS
+			*/
+			if(splitUrl[2] == 'getChars'){
+				console.log(chalk.green('> Get characteristics'));
+				var chars = Object.keys(device.paths[service]);
+				if(chars.length > 0){
+					response.write(device.paths[service]);
+					response.end();
+				}else{
+					getCharacteristics(deviceId, service, response);
+				}
+			}else{
+				response.write('Unknown request');
+				response.end();
+			}
+			break;
+		case 4:
+			var deviceId = splitUrl[0];
+			verifyDevice(deviceId);
+			var service = splitUrl[1];
+			var char = splitUrl[2];
+			/*
+			READ
+			*/
+			if(splitUrl[3] == 'read'){
+				console.log(chalk.green('> Read'));
+				read(response,service,char);
+			}else if(splitUrl[3] == 'sub'){
+				console.log(chalk.green('> Subscribe'));
+				subscribe(service,char,response);
+			}
+			break; 
+	}
+}
+
+function verifyDevice(deviceId){
+	var device = manager.getDevice(deviceId);
+	if(connected_peripheral.id !== device.peripheral.id){
+		disconnectPeripheral();
+		connected_peripheral = device.peripheral;
+		initialisePeripheral();
+	}
+	return;
+}
+
+function alive(response){
+	response.write('alive');
+	response.end();
+}
+
+function deviceConnect(response, id){
+	if(manager.deviceExists(id)){
+		console.log(chalk.green('> Device exists, connecting'));
+		var device = manager.getDevice(id);
+		connected_peripheral = device.peripheral;
+		initialisePeripheral();
+		response.write('Trying to connect');
+		response.end();
+	}else{
+		disconnectPeripheral();
+		response.write('Unknown Peripheral');
+		response.end();
+	}
+}
 
 function initialisePeripheral(){
 	if(connected_peripheral){
@@ -33,7 +171,7 @@ function initialisePeripheral(){
 				connected = true;
 				console.log('Connection established');
 			}
-		})
+		});
 
 	}
 }
@@ -50,18 +188,14 @@ function disconnectPeripheral(){
 
 server.on('request', function(req, res){
 	console.log(chalk.green(req.method + ' request'));
-
+	console.log(req.url.substr(1));
 	switch(req.method){
 		case 'GET':
 			console.log(chalk.cyan('GET REQUEST RECEIVED'));
 			if(req.headers['Observe']!==0)
-				return get(req.url, res);
-			get(req.url,res,true);
-			//console.log(chalk.cyan('OUTGOING RES PAYLOAD: ' + res.payload));
+				return reqParser(req.url, res);
+			reqParser(req.url,res,true);
 			break;
-		//case    'PUT':
-		//case   'POST':
-		//case 'DELETE':
 		default:
 			res.write('Sorry, the server is not yet configured for ' + req.method + ' requests.');
 			res.end('\n');
@@ -69,178 +203,36 @@ server.on('request', function(req, res){
 	}
 });
 
-function get(url, response, obs=false){
-	var splitUrl = url.split('/');
+function wellKnownObs(res){
+	console.log(chalk.cyan('WELL KNOWN PROCESSING'));
 
-	if(splitUrl.length == 2){
-		disconnectPeripheral();
-		console.log(chalk.blue('ALIVE'));
-		response.write('roger');
-		response.end();
-	}
-
-	//coap standard uri for important information on server
-	if(splitUrl.length > 2 && splitUrl[1] === '.well-known' && splitUrl[2] === "core"){
-		disconnectPeripheral();
-		console.log(chalk.cyan('WELL KNOWN REQUEST'));
-		console.log(splitUrl);
-		if(splitUrl.length==4){
-			wellKnown(response,splitUrl[3]);
-		}else{
-			wellKnown(response);
-		}
-
-	} else{
-		//process get requests for other devices
-		//URI structure: https://docs.google.com/document/d/1GqtmLli6Ir9sQcguDK4Bmhh9O_I5s4M740KlFlFNurI/
-
-		if(splitUrl.length > 2){
-
-			var deviceId = splitUrl[1];
-
-			if(!discoveries[deviceId]){
-				response.write('Unknown device id');
-				response.end();
-			}else{
-
-				if(!connected_peripheral){
-					console.log('No peripheral connected');
-					connected_peripheral = discoveries[deviceId].peripheral;
-				}else if(connected_peripheral !== discoveries[deviceId].peripheral){
-					console.log('Switching peripheral');
-					disconnectPeripheral();
-					connected_peripheral = discoveries[deviceId].peripheral;
-					initialisePeripheral();
-				}
-				if(!connected){
-					console.log('Connecting to peripheral');
-					initialisePeripheral();
-				}
-
-				if(splitUrl[2] == "exp"){
-					console.log(chalk.cyan('Exploring device:' + deviceId));
-					//explore this device
-
-					if(discoveries[deviceId]){
-						//if(discoveries[deviceId].explored){
-						if(discoveries[deviceId].paths){
-							response.write(JSON.stringify(discoveries[deviceId].paths));
-							response.end();
-						}else{
-							getServicesSync(deviceId,response);
-						}
-					}else{
-						console.log(chalk.red('Error: Unknown peripheral'));
-						response.write('Unknown device id');
-						response.end();
-					}
-				}else{
-					//service interaction
-					var service = splitUrl[2];
-
-					/*
-					service will contain a UUID
-					interact with service/characteristic
-					- requires service validation
-					*/
-
-					var deviceJSON = discoveries[ deviceId ];
-					console.log(chalk.inverse('paths[service] = ' + JSON.stringify(deviceJSON.paths[service])));
-					if(deviceJSON && deviceJSON.paths[service]){
-
-
-						if(splitUrl.length == 5){// && (splitUrl[4] == 'read' || splitUrl[4] == 'sub')){
-							if(splitUrl[4] == 'read'){
-								console.log('read');
-								read(response,service,splitUrl[3]);
-							}else if(splitUrl[4] == 'sub'){
-								console.log('sub');
-								if(obs){
-									testSub(service,splitUrl[3],response);
-								}else{
-									subscribe(service,splitUrl[3],response);
-								}
-							}
-						} else if(deviceJSON.inRange){
-							console.log(chalk.inverse('Device in range'));
-							var argFour = splitUrl[3];
-							if(argFour == 'getChars'){
-								var keys = Object.keys(deviceJSON.paths[service]);
-								if(keys.length > 0){
-									response.write(deviceJSON.paths[service]);
-									response.end();
-								}else{
-									getCharacteristics(deviceId, service, response);
-								}
-
-							}
-						}else{
-							response.write("Device has gone out of range");
-							requestComplete(response,2);
-						}
-
-					}else{
-						response.write("service does not exist");
-						requestComplete(response, 1);
-					}
-
-				}
-			}
-		}else{
-			response.write("Invalid URI");
-			requestComplete(response,1);
+	var all = manager.getAll();
+	var keys = Object.keys(all);
+	for(var k in keys){
+		var thisDiscovery = all[keys[k]];
+		try{
+			res.write(JSON.stringify({'info': thisDiscovery.info, 'available': thisDiscovery.inRange}));
+		}catch(e){
+			console.log(e);
 		}
 	}
+	manager.on('new',function(device){
+		try{
+			res.write(JSON.stringify({'info': device.info, 'available': device.inRange}));
+		}catch(e){
+			console.log(e);
+		}
+	});
+
+	res.on('finish',function(){
+		console.log('Observe finished');
+		return;
+	});
 }
 
-function wellKnown(res,index=null){
-
-	console.log(chalk.cyan('WELL KNOWN PROCESSING'));
-	var modLUT = {};
-
-	var i = 0;
-	if(index){
-		i = index;
-	}
-	var responseLength = 0;
-	var getDiscoveries;
-	var keys = Object.keys(discoveries_LUT);
-	
-	var getDiscoveries = new Promise(function(resolve,reject){
-		async.whilst(
-			function(){ return i < keys.length && responseLength < 5; },
-			function(callback){
-				var thisDiscovery = discoveries[ discoveries_LUT[ keys[i] ] ];
-				modLUT[ discoveries_LUT[keys[i]] ] = { 'info': thisDiscovery.info, 'available': thisDiscovery.inRange };
-
-				i++; responseLength++;
-				callback(null,modLUT);
-			},
-			function(err,res){
-				if(err){
-					reject(err);
-				}else{ 
-					if(Object.keys(res).length > 0){
-						resolve(JSON.stringify(res));
-					}else{
-						resolve('N/A');
-					}
-				}
-			}
-		);
-		//if function doesn't complete in 15 seconds, force timeout
-		getDiscoveries = setTimeout(reject('Timeout'),10000);
-	});
-	getDiscoveries.then(function(result){
-		clearTimeout(getDiscoveries);
-		res.write(result);
-		res.end();
-	}).catch(function(err){
-		console.log(chalk.red(err));
-		res.write(err);
-		res.end();
-	});
-
+function wellKnown(res){
+	res.write(JSON.stringify(manager.getAll()));
+	res.end();
 }
 
 function isNumeric(str){ return !isNaN(str); }
@@ -281,25 +273,11 @@ noble.on('scanStop', function(){
 noble.on('discover', function(peripheral){
 	var id = peripheral.id;
 
-
-	//if discovery is new
-	if(!discoveries_LUT[id]){
-
+	if(!manager.deviceExists(id)){
 		var peripheralInfo = 'Device id: ' + id + ' Local Name: ' + peripheral.advertisement.localName;
 		
 		console.log(chalk.green('> Peripheral Info: ' + peripheralInfo));
 
-		var this_index = discoveries.length;
-		discoveries_LUT[id] = this_index;
-
-		discoveries.push({
-			"peripheral": peripheral,
-			"info": peripheralInfo,
-			"inRange": true,
-			"lastSeen": Date.now(),
-			"explored": false
-		});
-		//console.log(chalk.magenta(JSON.stringify(peripheral.advertisement.serviceData)+'\n'+JSON.stringify(peripheral.advertisement.serviceUuids)));
 		var services = {};
 		if(peripheral.advertisement.serviceData && peripheral.advertisement.serviceData.length > 0){
 			
@@ -313,22 +291,24 @@ noble.on('discover', function(peripheral){
 				services[(peripheral.advertisement.serviceUuids[uuid])]={};
 			}
 		}
-		if(Object.keys(services).length>0){
-			discoveries[this_index].paths = services;
-		}
+		var deviceJson = {
+			"peripheral": peripheral,
+			"info": peripheralInfo,
+			"inRange": true,
+			"lastSeen": Date.now(),
+			"explored": false,
+			"paths": services
+		};
+		manager.addDevice(deviceJson);
 
 		console.log(chalk.green('> New peripheral discovered: ' + peripheral.advertisement.localName + ' @ ' + new Date()));
-
 	}
 
-	discoveries[ discoveries_LUT[id] ].lastSeen = Date.now();
-	if(!discoveries[ discoveries_LUT[id] ].inRange){
-		console.log(chalk.green('> Peripheral back in range'));
-		discoveries[ discoveries_LUT[id] ].inRange = true;
-	}
+	if(manager.deviceExists(id))
+		manager.updateLastSeen(id);
 });
 
-function getServicesSync(index,response){
+function getServicesSync(response){
 
 	var url_paths={};
 
@@ -354,12 +334,18 @@ function getServicesSync(index,response){
 					console.log(chalk.bgGreen(services[i].uuid));
 					url_paths[services[i].uuid] = {};
 				}
-				discoveries[index].explored = true;
-				if((discoveries[index].paths) && Object.keys(discoveries[index].paths).length < Object.keys(url_paths).length){
-					disoveries[index].paths = url_paths;
-					
+				manager.updateDevice(connected_peripheral.id,'explored',true);
+				//discoveries[index].explored = true;
+				var device = manager.getDevice(connected_peripheral.id,true);
+				var paths;
+				if((device.paths) && Object.keys(device.paths).length < Object.keys(url_paths).length){
+					manager.updateDevice(connected_peripheral.id,'paths',url_paths);
+					//disoveries[index].paths = url_paths;
+					paths = url_paths;
+				}else{
+					paths = device.paths;
 				}
-				resolve(JSON.stringify(discoveries[index].paths));
+				resolve(JSON.stringify(paths));
 			}
 		});
 		
@@ -385,7 +371,7 @@ function getServicesSync(index,response){
 }
 
 //response optional parameter
-function getServices(index,response){
+function getServices(response){
 
 	console.log(chalk.cyan('Fetching Services'));
 	var url_paths = {};
@@ -422,18 +408,23 @@ function getServices(index,response){
 					if(serviceErr){
 						reject(serviceErr);
 					}else{
-						discoveries[index].explored = true;
-						if(Object.keys(url_paths).length > Object.keys(discoveries[index].paths).length){
-							discoveries[index].paths = url_paths;
+						var device = manager.getDevice(connected_peripheral.id,true);
+						manager.updateDevice(connected_peripheral.id,'explored',true);
+						//discoveries[index].explored = true;
+						var paths = device.paths;
+						if(Object.keys(url_paths).length > Object.keys(device.paths).length){
+							manager.updateDevice(connected_peripheral.id,'paths',url_paths);
+							//discoveries[index].paths = url_paths;
+							paths = url_paths;
 						}
-						resolve(JSON.stringify(discoveries[index].paths));
+						resolve(JSON.stringify(paths));
 					}
 				}
 			);
 
 		});
 
-		serviceTimeout = setTimeout(reject('Timeout'), 60000); //timeout after 1 minute
+		serviceTimeout = setTimeout(reject('Timeout'), 10000); //timeout after 1 minute
 
 	});
 
@@ -487,6 +478,8 @@ function getCharacteristics(index, uuid, response){
 								for(var j = 0; j < characteristics.length; j++){
 									var c = characteristics[j];
 
+									console.log('This char: ' + (c));
+
 									results[c.uuid] = {
 										name: c.name,
 										properties: c.properties
@@ -515,7 +508,9 @@ function getCharacteristics(index, uuid, response){
 
 	charsRetrieval.then(function(results){
 		console.log('Successfully retrieved characteristics');
-		discoveries[index].paths[uuid] = results;
+		var device = manager.getDevice(connected_peripheral.id,true);
+		device.paths[uuid] = results;
+		manager.postDevice(connected_peripheral.id,device,true);
 		response.write(results);
 		response.end();
 	
@@ -570,7 +565,17 @@ function read(response, service, characteristic){
 										if(err){
 											reject(err);
 										}else{
-											var readData = { data: data.readInt16BE(0) };
+											console.log(c.name + ': ' + data.toString());
+
+											var translatedData;
+											try{
+												translatedData = data.readInt16BE(0);
+											}catch(e){
+												console.log(e);
+												translatedData = data.toString();
+											}
+
+											var readData = { data: translatedData };
 											console.log(chalk.blue('Data: ' + readData));
 											callback(null, JSON.stringify(readData));
 										}
@@ -685,11 +690,11 @@ function readSync(response, service, characteristic){
 	});
 }
 
-function testSub(service,char,response){
+function subscribe(service,char,response){
 	if(!connected){
 		connected_peripheral.connect(function(err){
 			if(err){
-				response.write(err);
+				response.write(JSON.stringify(err));
 				response.end();
 			}else{
 				connected = true;
@@ -718,88 +723,29 @@ function testSub(service,char,response){
 
 					c.on('data',function(data,isNotification){
 
+						var translatedData;
+						try{
+							translatedData = data.readInt16BE(0);
+						}catch(e){
+							console.log(e);
+							translatedData = data.toString();
+						}
 						var jsonOut = {
 							time: Date.now(),
-							value: data.readInt16BE(0)
+							value: translatedData
 						};
 
 						response.write(JSON.stringify(jsonOut));
 					});
 
+					response.on('finish',function(){
+						console.log('Observe finished');
+						c.unsubscribe();
+						return;
+					})
+
 				}
 			});
 		}
 	})
-}
-
-function subscribe(service,char,response){
-	var subPromise = new Promise(function(resolve,reject){
-
-		if(!connected){
-			connected_peripheral.connect(function(err){
-				if(err){
-					reject(err);
-				}else{
-					connected = true;
-				}
-			});
-		}
-
-		connected_peripheral.discoverServices([service],function(serviceErr,services){
-
-			if(serviceErr){
-				reject(serviceErr);
-			}else{
-				for(var s in services){
-					var thisService = services[s];
-
-					thisService.discoverCharacteristics([char], function(charErr,chars){
-						if(charErr){
-							reject(charErr);
-						}else{
-							for(var c in chars){
-
-								var thisChar = chars[c];
-								thisChar.subscribe(function(subscribeErr){
-									if(subscribeErr){
-										reject(subscribeErr);
-									}
-								});
-
-								//isNotification is deprecated
-								thisChar.on('data',function(data,isNotification){
-									var thisTopic = discoveries_LUT[connected_peripheral.id]+'/'+service+'/'+char;
-
-									var message = {
-										topic: thisTopic,
-										payload: data.readInt16BE(0),
-										qos: 0,
-										retain: false
-									};
-
-									mqttServer.publish(message,function(){
-										console.log(thisTopic + ': data published');
-									});
-								});
-								resolve('Initiated Subscription');
-							}
-						}
-					});
-				}
-			}
-
-		});
-
-	});
-
-	subPromise.then(function(results){
-		console.log('Subscribe: '+results);
-		response.write(results);
-		response.end();
-	}).catch(function(error){
-		console.log('Subscribe: '+error);
-		response.write(error);
-		response.end();
-	});
-
 }

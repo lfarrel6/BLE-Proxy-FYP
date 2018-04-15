@@ -3,56 +3,67 @@ var router = express.Router();
 var coap = require('coap');
 var path = require('path');
 var fs = require('fs');
+var devices = [];
+var connectionStates = {};
 var websocketStream = require('websocket-stream/stream');
 
 router.get('/:ip', function(req,res){
 	res.sendFile(path.join(__dirname, '/public/pages/dash.html'));
 });
 
-router.get('/:ip/observations',function(req,res){
+router.ws('/:ip/observations', function(ws,req){
+
+	var streaming = true;
 	var ipAddr = req.params.ip;
-
-	console.log(req.query);
-
-	console.log('SENDING COAP REQUEST, ' + req.url);
-
-	var requestUrl = 'coap://'+ipAddr+':5683/.well-known/core';
-	
-	if(req.query.ind){
-		console.log(req.query.ind);
-		requestUrl=requestUrl+'/'+req.query.ind;
-	}
-	console.log(requestUrl);
-	var coapReq = coap.request(requestUrl);
-
-	var responseValue;
-
-	coapReq.on('response',function(coapRes){
-
-		coapRes.setEncoding('utf8');
-
-		if(coapRes.payload == "N/A"){
-			res.write("N/A");
-			res.end();
-		}else{
-
-			coapRes.on('data',function(chunk){
-				res.write(chunk);
-			});
-		
-			coapRes.on('end', function(){
-				console.log('COAP RESPONSE COMPLETE');
-				res.end();
-			});
-		}
-
+	if(!devices[ipAddr])
+		devices[ipAddr] = [];
+	var coapReq = coap.request({
+		host: ipAddr,
+		pathname: '.well-known/core',
+		observe: true
 	});
+
+	try{
+		coapReq.on('response', function(coapRes){
+
+			ws.on('close',function(){
+				streaming = false;
+				console.log('Streaming finished');
+				coapRes.close();
+				return;
+			});
+
+			coapRes.on('data', function(data){
+				devices[ipAddr].push(JSON.parse(data.toString()));
+
+				if(streaming){
+					try{
+						ws.send(data.toString());
+					}catch(e){
+						console.log(e);
+					}
+				}
+
+			});
+
+		});
+	}catch(e){
+		console.log(e);
+	}
 	coapReq.end();
-	
+
 });
 
 router.get('/:ip/:device',function(req,res){
-	res.sendFile(path.join(__dirname, '/public/pages/device-interface.html'));
+	var ipAddr = req.params.ip;
+	var deviceId = req.params.device;
+	var connectReq = coap.request('coap://'+ipAddr+':5683/'+deviceId);
+
+	connectReq.on('response',function(coapRes){
+		res.sendFile(path.join(__dirname, '/public/pages/device-interface.html'));
+	});
+	connectReq.end();
+
 });
 
 router.get('/:ip/:device/:service/:char/read',function(req,res){
@@ -104,6 +115,7 @@ router.ws('/:ip/:device/:service/:char/sub',function(ws,req){
 		ws.on('close',function(){
 			streaming = false;
 			console.log('Websocket closed');
+			coapRes.close();
 			return;
 		})
 
@@ -170,38 +182,5 @@ router.get('/:ip/:device/:service/getChars',function(req,res){
 	coapReq.end();
 });
 
-router.all('/:ip/:device/:service/:char/sub',function(req,res){
-
-	var address = 'mqtt://'+req.params.ip;
-
-	/**SUBSCRIBE TO TOPICS**/
-	if(!clientManager.hasClient(address)){
-		clientManager.createClient(address,1883);
-		clientManager.on('error',(err) => {
-			console.log(err);
-		});
-	}
-
-	clientManager.on('connect',function(){
-		clientManager.subscribe(address,req.params.device+'/'+req.params.service+'/'+req.params.char);
-		clientManager.on('subscribe',() => {
-			console.log('Subscribed')
-		});
-	});
-	clientManager.on('message',function(topic,message){
-		console.log(topic.toString() + ': ' + message.toString());
-	});
-
-});
-
-router.all('/:ip/:device/:service/:char/unsub',function(req,res){
-	var address = 'mqtt://'+req.params.ip;
-	if(clientManager.hasClient(address)){
-		clientManager.unsubscribe(address,req.params.device+'/'+req.params.service+'/'+req.params.char);
-		clientManager.on('unsubscribe',() => {
-			console.log('Successfully unsubscribed');
-		});
-	}
-});
 
 module.exports = router;

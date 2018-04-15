@@ -23,6 +23,9 @@
 	</div>
 
 	<script type="text/javascript">
+		var devicesWebsocket;
+		var deviceCount=0;
+
 		$(document).ready(function(){
 			console.log('Document loaded, fetching data');
 			
@@ -32,19 +35,31 @@
 
 			var minute = 60000;
 
-			setInterval(function(){
-				console.log('Update data');
-				console.log(document.getElementById('observations').children.length);
-				retrieveData(document.getElementById('observations').children.length);
-			},minute/6);
 		});
 
 		function retrieveData(index = null){
-			var url = location.href+'/observations';
-			if(index){
-				url += '?ind='+index;
+			var splitUrl = (location.href+'/observations').split('/');
+			var url = 'ws://';
+			for(var i = 2; i < splitUrl.length; i++){
+				url += splitUrl[i] + (i+1==splitUrl.length?'':'/');
 			}
-			$.get(url, null, function(data){
+			devicesWebsocket = new WebSocket(url);
+
+			devicesWebsocket.onerror = function(e){
+				console.log(e);
+			};
+			devicesWebsocket.onclose = function(){
+				console.log('Sockets closed');
+			};
+			devicesWebsocket.onmessage = function(msg){
+				if(deviceCount==0){
+					document.getElementById('loading-gif').style.display='none';
+				}
+				addDevice(deviceCount++,JSON.parse(msg.data));
+			};
+
+
+			/*$.get(url, null, function(data){
 
 				if(typeof data === undefined){
 					console.log('no data on proxy');
@@ -82,6 +97,33 @@
 
 				}
 			}, 'json');
+			*/
+		}
+
+		function addDevice(id, d){
+			var datumElem = document.getElementById(id);
+			var datumBtn = document.getElementById(id+'-btn');
+
+			if(!document.getElementById(id)){
+				var listItem = document.createElement('li');
+				listItem.setAttribute('id',id);
+				listItem.className = "peripheral-li";
+				document.getElementById('observations').appendChild(listItem);
+
+				datumBtn = document.createElement('button');
+				datumBtn.setAttribute('id',id+'-btn');
+				datumBtn.innerHTML = d.info;
+				listItem.appendChild(datumBtn);
+
+			}
+
+			datumBtn.className = "dashboard-buttons" + (d.available?" active":" out-of-range");
+
+			$('#'+datumBtn.id).click(function(){ 
+				document.cookie="device="+$(this).text();
+				console.log($(this).parent().prop('id'));
+				peripheralSelected($(this).parent().prop('id')); 
+			});
 		}
 
 	</script>
