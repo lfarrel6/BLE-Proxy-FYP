@@ -12,7 +12,7 @@
     "Device Information": "0x180A",
     "Environmental Sensing": "0x181A",
     "Fitness Machine": "0x1826",
-    " Generic Access": "0x1800",
+    "Generic Access": "0x1800",
     "Generic Attribute": "0x1801",
     "Glucose": "0x1808",
     "Health Thermometer": "0x1809",
